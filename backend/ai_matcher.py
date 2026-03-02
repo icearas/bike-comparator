@@ -97,9 +97,11 @@ def are_same_product(name_cr: str, name_bd: str, category: str) -> tuple[bool, f
                 max_tokens=50,
                 messages=[{
                     "role": "user",
-                    "content": f"""Same bike product? Category: {category}
+                    "content": f"""Are these the exact same bike component model? Focus on model numbers.
+Category: {category}
 P1: {name_cr}
 P2: {name_bd}
+If model numbers match = same product. Ignore cable length, color, front/rear variants.
 JSON only: {{"same": true/false, "confidence": 0.0-1.0}}"""
                 }]
             )
