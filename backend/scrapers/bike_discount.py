@@ -19,7 +19,6 @@ CATEGORIES = {
     "przerzutki": "https://www.bike-discount.de/en/bike/bike-parts/mountain-bike-parts/rear-derailleurs",
 }
 
-# Marki dozwolone per kategoria - sprawdzane po URL
 ALLOWED_URL_BRANDS = {
     "przerzutki": ["shimano", "sram"],
     "kasety": ["shimano", "sram"],
@@ -30,7 +29,6 @@ ALLOWED_URL_BRANDS = {
     "dampery": ["rockshox", "fox"],
 }
 
-# Grupy produktów per kategoria - sprawdzane po nazwie
 ALLOWED_GROUPS = {
     "przerzutki": [
         "deore", "slx", "xt ", "xtr", "saint",
@@ -70,6 +68,23 @@ SUSPENSION_SKIP = [
     "cable", "hose", "bleed", "spring", "foam ring",
 ]
 
+# Stare modele Shimano - wycofane, nieobecne w CR
+SHIMANO_OLD_MODELS = {
+    "M7000", "M8000", "M781", "M772", "M786", "M670", "M660",
+    "M615", "M610", "M6000", "M5000", "M530", "M521", "M510",
+    "HG400", "HG50", "HG31", "M785", "M675", "M596", "M592",
+}
+
+
+def is_current_shimano(name: str) -> bool:
+    """Zwraca False dla starych modeli Shimano nieobecnych w CR"""
+    name_upper = name.upper()
+    if not any(k in name_upper for k in ["SHIMANO", "DEORE", "SLX", "XTR", "SAINT", "ZEE"]):
+        return True  # nie Shimano, przepuszczamy
+    if any(old in name_upper for old in SHIMANO_OLD_MODELS):
+        return False
+    return True
+
 
 def is_valid_product(name: str, url: str, category: str) -> bool:
     url_lower = url.lower()
@@ -89,6 +104,10 @@ def is_valid_product(name: str, url: str, category: str) -> bool:
     if category in ("widelce", "dampery"):
         if any(skip in name_lower for skip in SUSPENSION_SKIP):
             return False
+
+    # 4. Odfiltruj stare modele Shimano
+    if not is_current_shimano(name):
+        return False
 
     return True
 

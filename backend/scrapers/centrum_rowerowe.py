@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
@@ -45,7 +46,7 @@ ALLOWED_GROUPS = {
         "eagle 70", "eagle 90", "xg-1", "xs-1",
     ],
     "lancuchy": [
-        "deore", "slx", "xt ", "xtr",
+        "deore", "slx", "xt ",  "xtr",
         "cn-m6", "cn-m7", "cn-m8", "cn-m9",
         "gx eagle", "nx eagle", "xx1 eagle", "eagle",
     ],
@@ -62,6 +63,23 @@ ALLOWED_GROUPS = {
         "eagle 70", "eagle 90",
     ],
 }
+
+# Stare modele Shimano - wycofane, niedostępne w BD
+SHIMANO_OLD_MODELS = {
+    "M7000", "M8000", "M781", "M772", "M786", "M670", "M660",
+    "M615", "M610", "M6000", "M5000", "M530", "M521", "M510",
+    "HG400", "HG50", "HG31", "M785", "M675", "M596", "M592",
+}
+
+
+def is_current_shimano(name: str) -> bool:
+    """Zwraca False dla starych modeli Shimano nieobecnych w BD"""
+    name_upper = name.upper()
+    if not any(k in name_upper for k in ["SHIMANO", "DEORE", "SLX", "XTR", "SAINT", "ZEE"]):
+        return True  # nie Shimano, przepuszczamy
+    if any(old in name_upper for old in SHIMANO_OLD_MODELS):
+        return False
+    return True
 
 
 def is_valid_suspension(name: str) -> bool:
@@ -89,6 +107,10 @@ def is_valid_product(name: str, category: str) -> bool:
     if category in ALLOWED_GROUPS:
         if not any(kw in name_lower for kw in ALLOWED_GROUPS[category]):
             return False
+
+    # 3. Odfiltruj stare modele Shimano
+    if not is_current_shimano(name):
+        return False
 
     return True
 
