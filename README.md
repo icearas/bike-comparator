@@ -1,33 +1,40 @@
 # 🚵 Bike Parts Price Comparator
 
-Narzędzie do porównywania cen części rowerowych między sklepami internetowymi. Automatycznie scrape'uje produkty, dopasowuje je między sklepami przy użyciu AI i prezentuje różnice cenowe.
+Narzędzie do porównywania cen części rowerowych między sklepami internetowymi. Automatycznie scrape'uje produkty, dopasowuje je przy użyciu AI i prezentuje różnice cenowe.
 
-## Obsługiwane sklepy
+---
 
-- **centrumrowerowe.pl** (ceny w PLN)
-- **bike-discount.de** (ceny w EUR)
+## 🛒 Obsługiwane sklepy
 
-## Obsługiwane kategorie
+| Sklep | Waluta |
+|-------|--------|
+| centrumrowerowe.pl | PLN |
+| bike-discount.de | EUR |
 
-- Przerzutki tylne
-- Hamulce
-- Kasety
-- Łańcuchy
-- Manetki
-- Amortyzatory / Dampery
-- Widelce
+---
 
-## Obsługiwane marki i grupy
+## 📦 Obsługiwane kategorie i marki
 
-| Marka | Grupy |
-|-------|-------|
-| Shimano | Deore, SLX, XT, XTR |
-| SRAM | Eagle 70, Eagle 90, GX, X0, XX, NX, X01, XX1 |
-| RockShox | Wszystkie modele (ZEB, Pike, Lyrik, SID, Judy...) |
-| FOX | Wszystkie modele |
-| SRAM (hamulce) | Guide, Maven, DB8 |
+| Kategoria | Marka | Grupy |
+|-----------|-------|-------|
+| Przerzutki tylne | Shimano | Deore, SLX, XT, XTR, Saint |
+| Przerzutki tylne | SRAM | Eagle 70/90, GX, NX, X01, XX1 |
+| Hamulce tarczowe | Shimano | Deore, SLX, XT, XTR, Saint |
+| Hamulce tarczowe | SRAM | Guide, Maven, DB8 |
+| Kasety | Shimano | Deore, SLX, XT, XTR |
+| Kasety | SRAM | Eagle 70/90, GX, NX, X01, XX1 |
+| Łańcuchy | Shimano | Deore, SLX, XT, XTR |
+| Łańcuchy | SRAM | Eagle (wszystkie) |
+| Manetki | Shimano | Deore, SLX, XT, XTR, Saint |
+| Manetki | SRAM | Eagle 70/90, GX, NX, X01, XX1 |
+| Widelce | RockShox | Wszystkie modele |
+| Widelce | FOX | Wszystkie modele |
+| Dampery | RockShox | Wszystkie modele |
+| Dampery | FOX | Wszystkie modele |
 
-## Struktura projektu
+---
+
+## 🗂 Struktura projektu
 
 ```
 bike-comparator/
@@ -43,15 +50,21 @@ bike-comparator/
 └── frontend/                   # (w budowie)
 ```
 
-## Baza danych
+---
+
+## 🗄 Baza danych
 
 SQLite (`backend/bike_comparator.db`) z tabelami:
 
-- **products** – produkty ze wszystkich sklepów
-- **matched_products** – dopasowane pary produktów między sklepami
-- **filter_rules** – reguły filtrowania (jakie marki/grupy śledzić)
+| Tabela | Opis |
+|--------|------|
+| `products` | Produkty ze wszystkich sklepów |
+| `matched_products` | Dopasowane pary produktów między sklepami |
+| `filter_rules` | Reguły filtrowania (marki i grupy do śledzenia) |
 
-## Setup
+---
+
+## ⚙️ Setup
 
 ### Wymagania
 
@@ -77,6 +90,10 @@ playwright install chromium
 echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
 ```
 
+---
+
+## 🚀 Uruchomienie
+
 ### Pierwsze uruchomienie
 
 ```bash
@@ -95,10 +112,13 @@ python main.py
 python ai_matcher.py
 ```
 
-### Kolejne uruchomienia
+### Kolejne uruchomienia (odświeżenie cen)
 
 ```bash
-# Odśwież ceny (scraping)
+cd backend
+source ../.venv/bin/activate
+
+# Odśwież ceny
 python main.py
 
 # Wyczyść stare dopasowania i dopasuj ponownie
@@ -106,72 +126,39 @@ python3 -c "from models import SessionLocal, MatchedProduct; db = SessionLocal()
 python ai_matcher.py
 ```
 
-## Jak działa dopasowywanie
+> ⚠️ Dopasowywanie AI wymaga stabilnego połączenia z Anthropic API. W razie problemów z siecią domową użyj mobilnego hotspotu.
+
+---
+
+## 🤖 Jak działa dopasowywanie AI
 
 1. Produkty są filtrowane przez reguły z tabeli `filter_rules` (tylko wybrane marki i grupy)
 2. Akcesoria (klocki, linki, płyny itp.) są odrzucane przez listę `SKIP_KEYWORDS`
 3. Dla każdego produktu z CR szukamy kandydatów z BD tej samej marki i kategorii
 4. Claude Haiku ocenia czy dwa produkty to ten sam produkt (zwraca JSON z `same` i `confidence`)
-5. Dopasowania z confidence ≥ 85% są zapisywane do bazy
+5. Dopasowania z confidence ≥ 92% są zapisywane do bazy
 
-## Zarządzanie regułami filtrowania
+---
 
-Reguły filtrowania są w tabeli `filter_rules`. Możesz je edytować bezpośrednio w bazie lub modyfikować `seed_rules.py` i uruchomić ponownie:
+## 🛠 Przydatne komendy
+
+### Eksport produktów do CSV
 
 ```bash
-python seed_rules.py
-```
-
-Struktura reguły:
-- `category` – kategoria produktu (przerzutki, hamulce, kasety...)
-- `brand` – marka (SHIMANO, SRAM, ROCKSHOX, FOX)
-- `model_keyword` – słowo kluczowe w nazwie (np. "deore xt", "gx eagle") lub `NULL` = wszystkie modele marki
-- `active` – 1/0 czy reguła jest aktywna
-
-## Znane problemy
-
-- **bike-discount.de** nie podaje marki w nazwie produktu – marka jest wyciągana z URL
-- Kategorie różnią się między sklepami: CR używa `amortyzatory`, BD używa `dampery`
-- Wymagane stabilne połączenie internetowe podczas dopasowywania AI (Anthropic API)
-
-## TODO
-
-- [ ] Dodać widelce do scrapora centrumrowerowe.pl
-- [ ] Dodać trzeci sklep: bikeinn.com
-- [ ] dodac czwarty sklep: sprint-rowery.pl
-- [ ] Zbudować FastAPI backend z endpointami
-- [ ] Zbudować React frontend z tabelą porównań
-- [ ] Dodać automatyczne odświeżanie cen (cron)
-- [ ] Dodać kursy walut PLN/EUR
-- [ ] dodac banner z buy a coffe 
-
-## CSV file download
-
 cd ~/bike-comparator/backend
 python3 -c "
-import sqlite3
-import csv
+import sqlite3, csv
 
 conn = sqlite3.connect('bike_comparator.db')
 cursor = conn.cursor()
 
-cursor.execute('''
-    SELECT name, category, price 
-    FROM products 
-    WHERE shop=\"centrumrowerowe.pl\"
-    ORDER BY category, name
-''')
+cursor.execute(\"SELECT name, category, price FROM products WHERE shop='centrumrowerowe.pl' ORDER BY category, name\")
 with open('cr_products.csv', 'w', newline='', encoding='utf-8') as f:
     writer = csv.writer(f)
     writer.writerow(['name', 'category', 'price_pln'])
     writer.writerows(cursor.fetchall())
 
-cursor.execute('''
-    SELECT name, category, price
-    FROM products
-    WHERE shop=\"bike-discount.de\"
-    ORDER BY category, name
-''')
+cursor.execute(\"SELECT name, category, price FROM products WHERE shop='bike-discount.de' ORDER BY category, name\")
 with open('bd_products.csv', 'w', newline='', encoding='utf-8') as f:
     writer = csv.writer(f)
     writer.writerow(['name', 'category', 'price_eur'])
@@ -180,9 +167,11 @@ with open('bd_products.csv', 'w', newline='', encoding='utf-8') as f:
 conn.close()
 print('Gotowe: cr_products.csv i bd_products.csv')
 "
+```
 
-## Czyszczenie bazy i puszczanie sracpu od nowa
+### Wyczyszczenie bazy i scraping od nowa
 
+```bash
 python3 -c "
 from models import SessionLocal, Product
 db = SessionLocal()
@@ -192,3 +181,16 @@ db.close()
 print('Wyczyszczono')
 "
 python main.py
+```
+
+---
+
+## 📝 TODO
+
+- [ ] Dodać trzeci sklep: bikeinn.com
+- [ ] Dodać czwarty sklep: sprint-rowery.pl
+- [ ] Zbudować FastAPI backend z endpointami
+- [ ] Zbudować React frontend z tabelą porównań
+- [ ] Dodać automatyczne odświeżanie cen (cron)
+- [ ] Dodać kursy walut PLN/EUR
+- [ ] Dodać banner "Buy me a coffee"
