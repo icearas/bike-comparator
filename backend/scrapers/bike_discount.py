@@ -15,7 +15,6 @@ CATEGORIES = {
     "dampery": "https://www.bike-discount.de/en/bike/bike-parts/mountain-bike-parts/rear-shock",
     "lancuchy": "https://www.bike-discount.de/en/bike/bike-parts/mountain-bike-parts/chains",
     "kasety": "https://www.bike-discount.de/en/bike/bike-parts/mountain-bike-parts/cassettes",
-    "manetki": "https://www.bike-discount.de/en/bike/bike-parts/mountain-bike-parts/gear-shifters",
     "przerzutki": "https://www.bike-discount.de/en/bike/bike-parts/mountain-bike-parts/rear-derailleurs",
 }
 
@@ -24,7 +23,6 @@ ALLOWED_URL_BRANDS = {
     "kasety": ["shimano", "sram"],
     "lancuchy": ["shimano", "sram"],
     "hamulce": ["shimano", "sram"],
-    "manetki": ["shimano", "sram"],
     "widelce": ["rockshox", "fox"],
     "dampery": ["rockshox", "fox"],
 }
@@ -34,18 +32,18 @@ ALLOWED_GROUPS = {
         "deore", "slx", "xt ", "xtr", "saint",
         "rd-m6100", "rd-m6120", "rd-m7100", "rd-m7120",
         "rd-m8100", "rd-m8120", "rd-m8130", "rd-m9100", "rd-m9120", "rd-m8250",
-        "gx eagle", "nx eagle", "x01 eagle", "xx1 eagle", "eagle 70", "eagle 90",
+        "gx eagle", "x01 eagle", "xx1 eagle", "eagle 70", "eagle 90",
     ],
     "kasety": [
         "deore", "slx", "xt ", "xtr",
         "cs-m6", "cs-m7", "cs-m8", "cs-m9",
-        "gx eagle", "nx eagle", "x01 eagle", "xx1 eagle",
+        "x01 eagle", "xx1 eagle",
         "eagle 70", "eagle 90", "xg-1", "xs-1",
     ],
     "lancuchy": [
         "deore", "slx", "xt ", "xtr",
         "cn-m6", "cn-m7", "cn-m8", "cn-m9",
-        "gx eagle", "nx eagle", "xx1 eagle", "eagle",
+        "gx eagle", "x01 eagle", "xx1 eagle", "eagle",
     ],
     "hamulce": [
         "deore", "slx", "xt ", "xtr", "saint",
@@ -54,21 +52,18 @@ ALLOWED_GROUPS = {
         "m6100", "m7100", "m8100", "m8120", "m9100",
         "guide", "maven", "db8",
     ],
-    "manetki": [
-        "deore", "slx", "xt ", "xtr", "saint",
-        "sl-m6100", "sl-m7100", "sl-m8100", "sl-m9100",
-        "gx eagle", "nx eagle", "x01 eagle", "xx1 eagle",
-        "eagle 70", "eagle 90",
-    ],
 }
 
 SUSPENSION_SKIP = [
     "damper upgrade", "charger", "seal kit", "spare", "service kit",
     "oil", "grease", "bolt", "screw", "crown", "axle", "remote",
     "cable", "hose", "bleed", "spring", "foam ring",
+    # Modele poza zakresem
+    "revelation", "reba", "rudy", "judy",
+    "deluxe", "monarch",
+    "fox 32", "fox 34",
 ]
 
-# Stare modele Shimano - wycofane, nieobecne w CR
 SHIMANO_OLD_MODELS = {
     "M7000", "M8000", "M781", "M772", "M786", "M670", "M660",
     "M615", "M610", "M6000", "M5000", "M530", "M521", "M510",
@@ -77,10 +72,9 @@ SHIMANO_OLD_MODELS = {
 
 
 def is_current_shimano(name: str) -> bool:
-    """Zwraca False dla starych modeli Shimano nieobecnych w CR"""
     name_upper = name.upper()
     if not any(k in name_upper for k in ["SHIMANO", "DEORE", "SLX", "XTR", "SAINT", "ZEE"]):
-        return True  # nie Shimano, przepuszczamy
+        return True
     if any(old in name_upper for old in SHIMANO_OLD_MODELS):
         return False
     return True
@@ -90,22 +84,18 @@ def is_valid_product(name: str, url: str, category: str) -> bool:
     url_lower = url.lower()
     name_lower = name.lower()
 
-    # 1. Sprawdź markę po URL
     if category in ALLOWED_URL_BRANDS:
         if not any(brand in url_lower for brand in ALLOWED_URL_BRANDS[category]):
             return False
 
-    # 2. Sprawdź grupę po nazwie (tylko dla kategorii napędowych)
     if category in ALLOWED_GROUPS:
         if not any(kw in name_lower for kw in ALLOWED_GROUPS[category]):
             return False
 
-    # 3. Odrzuć akcesoria zawieszenia
     if category in ("widelce", "dampery"):
         if any(skip in name_lower for skip in SUSPENSION_SKIP):
             return False
 
-    # 4. Odfiltruj stare modele Shimano
     if not is_current_shimano(name):
         return False
 

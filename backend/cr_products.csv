@@ -1,5 +1,6 @@
 name,category,price_pln
 Hamulce tarczowe SRAM DB8,hamulce,349.99
+Hamulec tarczowy SHIMANO Deore BL-M4100 / BR-MT410,hamulce,262.99
 Hamulec tarczowy SHIMANO Deore BL-M4100 / BR-MT420,hamulce,209.99
 Hamulec tarczowy SHIMANO Deore BL-M6100 / BR-M6100,hamulce,249.99
 Hamulec tarczowy SHIMANO Deore BL-M6100 / BR-M6100 + Hamulec tarczowy SHIMANO Deore BL-M6100 / BR-M6100,hamulce,494.93
@@ -10,11 +11,11 @@ Hamulec tarczowy SHIMANO Deore XT BL-M8100 / BR-M8100 + Hamulec tarczowy SHIMANO
 Hamulec tarczowy SHIMANO Deore XT BL-M8100 / BR-M8120,hamulce,499.99
 Hamulec tarczowy SHIMANO Deore XT BL-M8200/BR-M8200,hamulce,564.99
 Hamulec tarczowy SHIMANO Deore XT BL-M8200/BR-M8220,hamulce,639.99
-Hamulec tarczowy SHIMANO SLX BL-M7100 / BR-M7100,hamulce,279.99
+Hamulec tarczowy SHIMANO SLX BL-M7100 / BR-M7100,hamulce,264.99
 Hamulec tarczowy SHIMANO SLX BL-M7100 / BR-M7100 + Hamulec tarczowy SHIMANO SLX BL-M7100 / BR-M7100,hamulce,541.48
 Hamulec tarczowy SHIMANO SLX BL-M7100 / BR-M7120,hamulce,369.99
 Hamulec tarczowy SHIMANO SLX BL-M7100 / BR-M7120 + Hamulec tarczowy SHIMANO SLX BL-M7100 / BR-M7120,hamulce,840.73
-Hamulec tarczowy SHIMANO Saint BL-M820 / BR-M820,hamulce,609.99
+Hamulec tarczowy SHIMANO Saint BL-M820 / BR-M820,hamulce,615.99
 Hamulec tarczowy SHIMANO XTR BL-M9100 / BR-M9100,hamulce,669.99
 Hamulec tarczowy SHIMANO XTR BL-M9100 / BR-M9100 + Hamulec tarczowy SHIMANO XTR BL-M9100 / BR-M9100,hamulce,1344.23
 Hamulec tarczowy SHIMANO XTR BL-M9120 / BR-M9120,hamulce,829.99
@@ -86,6 +87,7 @@ Kaseta SRAM Red XG-1290 E1,kasety,1439.0
 Kaseta SRAM Red XPLR XG-1391,kasety,2099.0
 Kaseta SRAM Rival AXS XPLR XG-1251,kasety,519.99
 Kaseta SRAM Rival XG-1250,kasety,399.99
+Kaseta SRAM Rival XPLR XG-1351 E1,kasety,669.99
 Kaseta SRAM X0 Eagle XS-1295 T-Type,kasety,1469.0
 Kaseta SRAM X01 Eagle XG-1295,kasety,1299.0
 Kaseta SRAM X01 Eagle XG-1295 + Łańcuch SRAM X01 Eagle,kasety,1468.69
@@ -96,7 +98,7 @@ Kaseta SRAM XS-1275 Eagle,kasety,899.99
 Kaseta SRAM XX Eagle XS-1297 T-Type,kasety,1999.0
 Kaseta SRAM XX SL Eagle XS-1299 T-Type,kasety,2299.0
 Kaseta SRAM XX1 Eagle XG-1299 ,kasety,1569.0
-Kaseta SRAM XX1 Eagle XG-1299  + Łańcuch SRAM XX1 Eagle,kasety,1782.19
+Kaseta SRAM XX1 Eagle XG-1299  + Łańcuch SRAM XX1 Eagle,kasety,1753.69
 Łańcuch SHIMANO 105 / GRX / SLX CN-M7100,lancuchy,89.99
 Łańcuch SHIMANO 105 / SLX CN-HG601,lancuchy,85.99
 Łańcuch SHIMANO Deore CN-HG53,lancuchy,59.99
@@ -211,7 +213,7 @@ Amortyzator rowerowy ROCK SHOX 35 Gold RL DB A2,widelce,649.99
 Amortyzator rowerowy ROCK SHOX 35 Silver TK,widelce,374.99
 Amortyzator rowerowy ROCK SHOX Domain R,widelce,699.99
 Amortyzator rowerowy ROCK SHOX Judy Gold RL,widelce,1389.0
-Amortyzator rowerowy ROCK SHOX Judy Silver TK,widelce,899.99
+Amortyzator rowerowy ROCK SHOX Judy Silver TK,widelce,599.99
 Amortyzator rowerowy ROCK SHOX Lyrik Select,widelce,1149.0
 Amortyzator rowerowy ROCK SHOX Lyrik Select D1,widelce,1199.0
 Amortyzator rowerowy ROCK SHOX Lyrik Ultimate,widelce,5499.0
@@ -221,8 +223,8 @@ Amortyzator rowerowy ROCK SHOX Paragon Gold RL,widelce,874.99
 Amortyzator rowerowy ROCK SHOX Pike DJ,widelce,3499.0
 Amortyzator rowerowy ROCK SHOX Pike Select Charger RC,widelce,3499.0
 Amortyzator rowerowy ROCK SHOX Pike Ultimate Charger 3 RC2,widelce,2249.0
-Amortyzator rowerowy ROCK SHOX Psylo Gold RC,widelce,2899.0
-Amortyzator rowerowy ROCK SHOX Psylo Silver,widelce,1699.0
+Amortyzator rowerowy ROCK SHOX Psylo Gold RC,widelce,1179.0
+Amortyzator rowerowy ROCK SHOX Psylo Silver,widelce,999.99
 Amortyzator rowerowy ROCK SHOX Reba Gold 2026,widelce,1799.0
 Amortyzator rowerowy ROCK SHOX Reba RL,widelce,1999.0
 Amortyzator rowerowy ROCK SHOX Recon Gold RL,widelce,699.99
@@ -239,10 +241,11 @@ Amortyzator rowerowy ROCK SHOX SID SL Select Charger RL,widelce,1399.0
 Amortyzator rowerowy ROCK SHOX SID SL Select+,widelce,1799.0
 Amortyzator rowerowy ROCK SHOX SID SL Ultimate 2026,widelce,3499.0
 Amortyzator rowerowy ROCK SHOX SID SL Ultimate Flight Attendant,widelce,6499.0
-Amortyzator rowerowy ROCK SHOX SID Select RL,widelce,1199.0
+Amortyzator rowerowy ROCK SHOX SID Select RL,widelce,1399.0
 Amortyzator rowerowy ROCK SHOX SID Ultimate Flight Attendant,widelce,3999.0
 Amortyzator rowerowy ROCK SHOX SID Ultimate Race Day,widelce,2999.0
 Amortyzator rowerowy ROCK SHOX Yari RC,widelce,1099.0
+Amortyzator rowerowy ROCK SHOX ZEB,widelce,4099.0
 Amortyzator rowerowy ROCK SHOX ZEB R,widelce,1799.0
 Amortyzator rowerowy ROCK SHOX ZEB Select Charger RC,widelce,3299.0
 Amortyzator rowerowy ROCK SHOX ZEB Ultimate Charger 3 RC2,widelce,2999.0
@@ -253,7 +256,7 @@ Damper rowerowy FOX RACING SHOX Float DPS Factory,widelce,2199.0
 Damper rowerowy FOX RACING SHOX Float DPS Performance Elite,widelce,2999.0
 Damper rowerowy FOX RACING SHOX Float Factory 2025,widelce,2149.0
 Damper rowerowy FOX RACING SHOX Float Performance Elite,widelce,1799.0
-Damper rowerowy FOX RACING SHOX Float SL Factory 2025,widelce,2599.0
+Damper rowerowy FOX RACING SHOX Float SL Factory 2025,widelce,2959.0
 Damper rowerowy FOX RACING SHOX Float X Factory,widelce,2499.0
 Damper rowerowy FOX RACING SHOX Float X Factory E-Tuned,widelce,999.99
 Damper rowerowy FOX RACING SHOX Float X Performance Elite,widelce,1899.0
@@ -261,8 +264,9 @@ Damper rowerowy FOX RACING SHOX Float X2,widelce,1499.0
 Damper rowerowy FOX RACING SHOX Float X2 Factory,widelce,2199.0
 Damper rowerowy FOX RACING SHOX Float X2 Factory 2026,widelce,3299.0
 Damper rowerowy FOX RACING SHOX Float X2 Performance Elite,widelce,1499.0
+Damper rowerowy ROCK SHOX Deluxe R,widelce,1499.0
 Damper rowerowy ROCK SHOX Deluxe Select,widelce,401.99
-Damper rowerowy ROCK SHOX Deluxe Select R,widelce,489.99
+Damper rowerowy ROCK SHOX Deluxe Select R,widelce,1499.0
 Damper rowerowy ROCK SHOX Deluxe Select+,widelce,349.99
 Damper rowerowy ROCK SHOX Deluxe Ultimate RCT,widelce,449.99
 Damper rowerowy ROCK SHOX Monarch Plus RC3,widelce,1399.0

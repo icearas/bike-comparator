@@ -11,7 +11,6 @@ CATEGORIES = {
     "dampery": "https://www.centrumrowerowe.pl/czesci/amortyzatory-rowerowe/tylne-dampery/",
     "kasety": "https://www.centrumrowerowe.pl/czesci/lancuchy-kasety-wolnobiegi/kasety-rowerowe/",
     "lancuchy": "https://www.centrumrowerowe.pl/czesci/lancuchy-kasety-wolnobiegi/lancuchy-rowerowe/",
-    "manetki": "https://www.centrumrowerowe.pl/czesci/manetki-klamkomanetki/",
     "przerzutki": "https://www.centrumrowerowe.pl/czesci/przerzutki-rowerowe/tylne/",
 }
 
@@ -21,7 +20,11 @@ SUSPENSION_SKIP = [
     "naklejki", "sticker", "decal", "manetka", "uszczelka", "seal",
     "olej", "oil", "serwis", "service", "pianka", "foam",
     "sprężyna", "sprezyna", "spring", "błotnik", "kapsel", "komplet",
-    "zestaw serwisowy", "zestaw uszczelek", "śruby", "tłumik"
+    "zestaw serwisowy", "zestaw uszczelek", "śruby", "tłumik",
+    # Modele poza zakresem
+    "revelation", "reba", "rudy", "judy",
+    "deluxe", "monarch",
+    "fox 32", "fox 34",
 ]
 
 ALLOWED_BRANDS = {
@@ -29,7 +32,6 @@ ALLOWED_BRANDS = {
     "kasety": ["shimano", "sram"],
     "lancuchy": ["shimano", "sram"],
     "hamulce": ["shimano", "sram"],
-    "manetki": ["shimano", "sram"],
 }
 
 ALLOWED_GROUPS = {
@@ -37,18 +39,18 @@ ALLOWED_GROUPS = {
         "deore", "slx", "xt ", "xtr", "saint",
         "rd-m6100", "rd-m6120", "rd-m7100", "rd-m7120",
         "rd-m8100", "rd-m8120", "rd-m8130", "rd-m9100", "rd-m9120", "rd-m8250",
-        "gx eagle", "nx eagle", "x01 eagle", "xx1 eagle", "eagle 70", "eagle 90",
+        "gx eagle", "x01 eagle", "xx1 eagle", "eagle 70", "eagle 90",
     ],
     "kasety": [
         "deore", "slx", "xt ", "xtr",
         "cs-m6", "cs-m7", "cs-m8", "cs-m9",
-        "gx eagle", "nx eagle", "x01 eagle", "xx1 eagle",
+        "x01 eagle", "xx1 eagle",
         "eagle 70", "eagle 90", "xg-1", "xs-1",
     ],
     "lancuchy": [
-        "deore", "slx", "xt ",  "xtr",
+        "deore", "slx", "xt ", "xtr",
         "cn-m6", "cn-m7", "cn-m8", "cn-m9",
-        "gx eagle", "nx eagle", "xx1 eagle", "eagle",
+        "gx eagle", "x01 eagle", "xx1 eagle", "eagle",
     ],
     "hamulce": [
         "deore", "slx", "xt ", "xtr", "saint",
@@ -56,15 +58,8 @@ ALLOWED_GROUPS = {
         "br-m6100", "br-m6120", "br-m7100", "br-m8100", "br-m8120", "br-m9100",
         "guide", "maven", "db8",
     ],
-    "manetki": [
-        "deore", "slx", "xt ", "xtr", "saint",
-        "sl-m6100", "sl-m7100", "sl-m8100", "sl-m9100",
-        "gx eagle", "nx eagle", "x01 eagle", "xx1 eagle",
-        "eagle 70", "eagle 90",
-    ],
 }
 
-# Stare modele Shimano - wycofane, niedostępne w BD
 SHIMANO_OLD_MODELS = {
     "M7000", "M8000", "M781", "M772", "M786", "M670", "M660",
     "M615", "M610", "M6000", "M5000", "M530", "M521", "M510",
@@ -73,10 +68,9 @@ SHIMANO_OLD_MODELS = {
 
 
 def is_current_shimano(name: str) -> bool:
-    """Zwraca False dla starych modeli Shimano nieobecnych w BD"""
     name_upper = name.upper()
     if not any(k in name_upper for k in ["SHIMANO", "DEORE", "SLX", "XTR", "SAINT", "ZEE"]):
-        return True  # nie Shimano, przepuszczamy
+        return True
     if any(old in name_upper for old in SHIMANO_OLD_MODELS):
         return False
     return True
@@ -98,17 +92,14 @@ def is_valid_suspension(name: str) -> bool:
 def is_valid_product(name: str, category: str) -> bool:
     name_lower = name.lower()
 
-    # 1. Sprawdź markę
     if category in ALLOWED_BRANDS:
         if not any(brand in name_lower for brand in ALLOWED_BRANDS[category]):
             return False
 
-    # 2. Sprawdź grupę
     if category in ALLOWED_GROUPS:
         if not any(kw in name_lower for kw in ALLOWED_GROUPS[category]):
             return False
 
-    # 3. Odfiltruj stare modele Shimano
     if not is_current_shimano(name):
         return False
 
@@ -150,12 +141,10 @@ async def scrape_category(category: str, max_pages: int = 15) -> list[dict]:
 
                     name = data.get("item_name", "")
 
-                    # Filtr dla kategorii napędowych
                     if category in ALLOWED_BRANDS:
                         if not is_valid_product(name, category):
                             continue
 
-                    # Filtr dla zawieszenia
                     actual_category = category
                     if category == "amortyzatory":
                         if not is_valid_suspension(name):

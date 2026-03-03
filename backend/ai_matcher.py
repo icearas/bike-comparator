@@ -16,7 +16,7 @@ load_dotenv(dotenv_path="../.env")
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 CONFIDENCE_THRESHOLD = 0.95
-PARALLEL_CALLS = 5
+PARALLEL_CALLS = 3
 MODEL = "claude-haiku-4-5-20251001"
 
 SKIP_KEYWORDS = [
@@ -28,7 +28,8 @@ SKIP_KEYWORDS = [
     "przerzutka przednia", "przednia shimano", "fd-", "kółko przerzutki",
     "tarcza", "rotor", "oneloc", "manetka blokady", "suntour", "sr suntour",
     "sora", "cs-hg50", "rock shox 35", "rockshox 35", "rock shox recon",
-    "recon silver", "recon gold", "paragon", "domain", "microshift", "rd-t", "advent"
+    "recon silver", "recon gold", "paragon", "domain", "microshift", "rd-t", "advent",
+    " + ",  # produkty combo (np. kaseta + łańcuch) — nie mają odpowiednika w BD
 ]
 
 BRAND_KEYWORDS = {
@@ -86,9 +87,12 @@ def extract_brand(name: str, url: str = "") -> str:
 
 
 def extract_model_numbers(name: str) -> list[str]:
-    """Wyciąga wszystkie numery modeli np. BL-M9220, BR-M9200, RD-M6100"""
+    """Wyciąga wszystkie numery modeli np. BL-M9220, BR-M9200, RD-M6100, BR-MT520, CS-HG81"""
     name_upper = name.upper()
+    # Standard: RD-M6100, BL-M9220, BR-M820 (0-1 litera po myślniku)
     results = re.findall(r'[A-Z]{1,3}-[A-Z]?\d{3,5}', name_upper)
+    # Dwuliterowe prefiksy: BR-MT520, CN-HG601, CS-HG81 (dokładnie 2 litery po myślniku)
+    results += re.findall(r'[A-Z]{1,3}-[A-Z]{2}\d{2,5}', name_upper)
     # SRAM cassette numbers: XG-1275 etc.
     results += re.findall(r'X[GS]-\d{4}', name_upper)
     # Short codes: DB8, M6100
@@ -108,7 +112,7 @@ Rules:
 - Ignore cable length, color and speed count (11-speed, 12-speed) when model number matches
 JSON only: {{"same": true/false, "confidence": 0.0-1.0}}"""
 
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             resp = await client.messages.create(
                 model=MODEL,
@@ -122,8 +126,20 @@ JSON only: {{"same": true/false, "confidence": 0.0-1.0}}"""
                 return result.get("same", False), result.get("confidence", 0.0)
             return False, 0.0
         except Exception as e:
-            print(f"  ⚠️ Claude err {attempt+1}: {e}")
-            await asyncio.sleep(2.0 * (2 ** attempt))
+            err_str = str(e)
+            if "429" in err_str or "rate_limit" in err_str.lower() or "concurrent" in err_str.lower():
+                wait_sec = 20.0 + attempt * 10
+                print(f"  ⚠️ Claude err {attempt+1} (rate limit) — czekam {wait_sec:.0f}s")
+            elif "529" in err_str or "overloaded" in err_str.lower():
+                wait_sec = 30.0 + attempt * 15
+                print(f"  ⚠️ Claude err {attempt+1} (overloaded) — czekam {wait_sec:.0f}s")
+            elif "500" in err_str:
+                wait_sec = 10.0 * (attempt + 1)
+                print(f"  ⚠️ Claude err {attempt+1} (server error) — czekam {wait_sec:.0f}s")
+            else:
+                wait_sec = 2.0 * (2 ** attempt)
+                print(f"  ⚠️ Claude err {attempt+1}: {e}")
+            await asyncio.sleep(wait_sec)
     return False, 0.0
 
 
@@ -133,13 +149,13 @@ _rate_lock = asyncio.Lock()
 
 async def rate_limited_call(name_cr: str, name_bd: str, category: str) -> tuple[bool, float]:
     global _last_call
-    async with _rate_lock:
+    async with _rate_lock:  # lock trzymany przez cały call — tylko 1 połączenie na raz
         now = time.time()
         wait = 1.3 - (now - _last_call)
         if wait > 0:
             await asyncio.sleep(wait)
         _last_call = time.time()
-    return await are_same_product(name_cr, name_bd, category)
+        return await are_same_product(name_cr, name_bd, category)
 
 
 async def match_with_ai(limit: int = 300):
@@ -196,9 +212,9 @@ async def match_with_ai(limit: int = 300):
                     candidates = filtered[:3]
                     print(f"🔍 [{i+1}] Pre-filter: {cr_models} → {len(candidates)} kandydatów")
                 else:
-                    candidates = candidates[:8]
+                    candidates = candidates[:15]
             else:
-                candidates = candidates[:8]
+                candidates = candidates[:15]
 
             # Sekwencyjne sprawdzanie - stop na pewnym matchu
             best_match = None
@@ -206,11 +222,9 @@ async def match_with_ai(limit: int = 300):
             for bd in candidates:
                 is_same, confidence = await rate_limited_call(cr.name, bd.name, cr.category)
                 if is_same and confidence >= CONFIDENCE_THRESHOLD:
-                    if confidence > best_confidence:
-                        best_match = bd
-                        best_confidence = confidence
-                    if confidence >= 0.99:
-                        break
+                    best_match = bd
+                    best_confidence = confidence
+                    break  # pierwszy dobry match wystarczy — pre-filter już wybrał kandydatów
 
             if best_match:
                 existing_match = db.query(MatchedProduct).filter_by(
