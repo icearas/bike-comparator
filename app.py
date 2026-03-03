@@ -91,7 +91,8 @@ filtered["oszczednosc_pct"] = (
 if only_cheaper:
     filtered = filtered[filtered["oszczednosc_pln"] > 0]
 
-filtered = filtered[filtered["oszczednosc_pct"] >= min_savings_pct]
+if min_savings_pct > 0:
+    filtered = filtered[filtered["oszczednosc_pct"] >= min_savings_pct]
 filtered = filtered.sort_values("oszczednosc_pct", ascending=False)
 
 # ── Metryki ───────────────────────────────────────────────────────────────────
