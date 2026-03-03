@@ -4,6 +4,7 @@ from pathlib import Path
 
 CR_ALL_PATH = Path(__file__).parent / "data" / "cr_all.csv"
 MATCHED_PATH = Path(__file__).parent / "data" / "matched_products.csv"
+RW_MATCHED_PATH = Path(__file__).parent / "data" / "rw_matched.csv"
 
 CATEGORY_LABELS = {
     "hamulce": "Hamulce",
@@ -22,7 +23,7 @@ st.set_page_config(
 )
 
 st.title("🚵 Bike Comparator")
-st.caption("centrumrowerowe.pl  vs  bike-discount.de")
+st.caption("centrumrowerowe.pl  vs  bike-discount.de  vs  rowerowy.com")
 
 
 @st.cache_data
@@ -34,7 +35,12 @@ def load_data() -> pd.DataFrame:
     matched["matched_at"] = pd.to_datetime(matched["matched_at"], utc=True, errors="coerce")
     matched = matched[["cr_url", "bd_name", "bd_price_eur", "bd_url", "matched_at"]]
 
-    return cr.merge(matched, on="cr_url", how="left")
+    rw = pd.read_csv(RW_MATCHED_PATH)
+    rw = rw[["cr_url", "rw_name", "rw_price_pln", "rw_url"]]
+
+    df = cr.merge(matched, on="cr_url", how="left")
+    df = df.merge(rw, on="cr_url", how="left")
+    return df
 
 
 df = load_data()
@@ -93,6 +99,18 @@ with st.sidebar:
         help="Ukryj produkty bez odpowiednika w bike-discount.",
     )
 
+    only_cheaper_rw = st.checkbox(
+        "Tylko tańsze w RW",
+        value=False,
+        help="Pokaż tylko produkty tańsze w rowerowy.com niż w CR.",
+    )
+
+    only_matched_rw = st.checkbox(
+        "Tylko z matchem w RW",
+        value=False,
+        help="Ukryj produkty bez odpowiednika w rowerowy.com.",
+    )
+
 search_query = st.text_input(
     "🔎 Szukaj produktu",
     placeholder="np. Shimano, FOX 36, XT...",
@@ -111,19 +129,31 @@ filtered["oszczednosc_pct"] = (
     filtered["oszczednosc_pln"] / filtered["cr_price_pln"] * 100
 ).round(1)
 
+filtered["rw_oszczednosc_pln"] = (filtered["cr_price_pln"] - filtered["rw_price_pln"]).round(2)
+filtered["rw_oszczednosc_pct"] = (
+    filtered["rw_oszczednosc_pln"] / filtered["cr_price_pln"] * 100
+).round(1)
+
 if search_query:
     q = search_query.strip().lower()
     mask = (
         filtered["cr_name"].str.lower().str.contains(q, na=False)
         | filtered["bd_name"].str.lower().str.contains(q, na=False)
+        | filtered["rw_name"].str.lower().str.contains(q, na=False)
     )
     filtered = filtered[mask]
 
 if only_matched:
     filtered = filtered[filtered["bd_price_eur"].notna()]
 
+if only_matched_rw:
+    filtered = filtered[filtered["rw_price_pln"].notna()]
+
 if only_cheaper:
     filtered = filtered[filtered["oszczednosc_pln"] > 0]
+
+if only_cheaper_rw:
+    filtered = filtered[filtered["rw_oszczednosc_pln"] > 0]
 
 if min_savings_pct > 0:
     filtered = filtered[filtered["oszczednosc_pct"] >= min_savings_pct]
@@ -134,19 +164,21 @@ unmatched_rows = filtered[filtered["bd_price_eur"].isna()].sort_values("cr_price
 filtered = pd.concat([matched_rows, unmatched_rows])
 
 # ── Metryki ───────────────────────────────────────────────────────────────────
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 
-matched_count = filtered["bd_price_eur"].notna().sum()
-taniej_count = (filtered["oszczednosc_pln"] > 0).sum()
-avg_savings = filtered.loc[filtered["oszczednosc_pln"] > 0, "oszczednosc_pct"].mean()
+matched_bd_count = filtered["bd_price_eur"].notna().sum()
+matched_rw_count = filtered["rw_price_pln"].notna().sum()
+taniej_bd = (filtered["oszczednosc_pln"] > 0).sum()
+taniej_rw = (filtered["rw_oszczednosc_pln"] > 0).sum()
+avg_sav_bd = filtered.loc[filtered["oszczednosc_pln"] > 0, "oszczednosc_pct"].mean()
+avg_sav_rw = filtered.loc[filtered["rw_oszczednosc_pln"] > 0, "rw_oszczednosc_pct"].mean()
 
 c1.metric("Produktów CR", len(filtered))
-c2.metric("Z matchem w BD", f"{matched_count} / {len(filtered)}")
-c3.metric("Taniej w BD", str(taniej_count))
-c4.metric(
-    "Śr. oszczędność",
-    f"{avg_savings:.1f}%" if pd.notna(avg_savings) else "—",
-)
+c2.metric("Match BD", f"{matched_bd_count} / {len(filtered)}")
+c3.metric("Taniej w BD", str(taniej_bd), f"śr. {avg_sav_bd:.1f}%" if pd.notna(avg_sav_bd) else None)
+c4.metric("Match RW", f"{matched_rw_count} / {len(filtered)}")
+c5.metric("Taniej w RW", str(taniej_rw), f"śr. {avg_sav_rw:.1f}%" if pd.notna(avg_sav_rw) else None)
+c6.metric("", "")
 
 st.divider()
 
@@ -157,22 +189,36 @@ else:
     rows_html = []
     for _, row in filtered.iterrows():
         has_bd = pd.notna(row.get("bd_price_eur"))
+        has_rw = pd.notna(row.get("rw_price_pln"))
         cr_link = f'<a href="{row["cr_url"]}" rel="noreferrer noopener" target="_blank">CR 🔗</a>' if row.get("cr_url") else "—"
 
         if has_bd:
-            color = "#1a7f37" if row["oszczednosc_pln"] > 0 else "#c0392b"
-            sign = "+" if row["oszczednosc_pln"] > 0 else ""
+            color_bd = "#1a7f37" if row["oszczednosc_pln"] > 0 else "#c0392b"
+            sign_bd = "+" if row["oszczednosc_pln"] > 0 else ""
             bd_eur = f"{row['bd_price_eur']:.2f} €"
             bd_pln = f"{row['bd_price_pln']:.2f} zł"
-            sav_pln = f'<td style="text-align:right;color:{color};font-weight:bold">{sign}{row["oszczednosc_pln"]:.2f} zł</td>'
-            sav_pct = f'<td style="text-align:right;color:{color};font-weight:bold">{sign}{row["oszczednosc_pct"]:.1f}%</td>'
+            sav_bd_pln = f'<td style="text-align:right;color:{color_bd};font-weight:bold">{sign_bd}{row["oszczednosc_pln"]:.2f} zł</td>'
+            sav_bd_pct = f'<td style="text-align:right;color:{color_bd};font-weight:bold">{sign_bd}{row["oszczednosc_pct"]:.1f}%</td>'
             bd_link = f'<a href="{row["bd_url"]}" rel="noreferrer noopener" target="_blank">BD 🔗</a>'
         else:
             bd_eur = "—"
             bd_pln = "—"
-            sav_pln = '<td style="text-align:right;color:#aaa">—</td>'
-            sav_pct = '<td style="text-align:right;color:#aaa">—</td>'
+            sav_bd_pln = '<td style="text-align:right;color:#aaa">—</td>'
+            sav_bd_pct = '<td style="text-align:right;color:#aaa">—</td>'
             bd_link = '<span style="color:#aaa">—</span>'
+
+        if has_rw:
+            color_rw = "#1a7f37" if row["rw_oszczednosc_pln"] > 0 else "#c0392b"
+            sign_rw = "+" if row["rw_oszczednosc_pln"] > 0 else ""
+            rw_pln = f"{row['rw_price_pln']:.2f} zł"
+            sav_rw_pln = f'<td style="text-align:right;color:{color_rw};font-weight:bold">{sign_rw}{row["rw_oszczednosc_pln"]:.2f} zł</td>'
+            sav_rw_pct = f'<td style="text-align:right;color:{color_rw};font-weight:bold">{sign_rw}{row["rw_oszczednosc_pct"]:.1f}%</td>'
+            rw_link = f'<a href="{row["rw_url"]}" rel="noreferrer noopener" target="_blank">RW 🔗</a>'
+        else:
+            rw_pln = "—"
+            sav_rw_pln = '<td style="text-align:right;color:#aaa">—</td>'
+            sav_rw_pct = '<td style="text-align:right;color:#aaa">—</td>'
+            rw_link = '<span style="color:#aaa">—</span>'
 
         rows_html.append(f"""
         <tr>
@@ -181,10 +227,14 @@ else:
             <td style="text-align:right">{row['cr_price_pln']:.2f} zł</td>
             <td style="text-align:right">{bd_eur}</td>
             <td style="text-align:right">{bd_pln}</td>
-            {sav_pln}
-            {sav_pct}
+            {sav_bd_pln}
+            {sav_bd_pct}
+            <td style="text-align:right">{rw_pln}</td>
+            {sav_rw_pln}
+            {sav_rw_pct}
             <td style="text-align:center">{cr_link}</td>
             <td style="text-align:center">{bd_link}</td>
+            <td style="text-align:center">{rw_link}</td>
         </tr>""")
 
     table_html = f"""
@@ -195,18 +245,21 @@ else:
         .pt tr:hover td {{ background:#f7f8fa; }}
         .pt a {{ color:#0068c9; text-decoration:none; }}
         .pt a:hover {{ text-decoration:underline; }}
+        .pt th.sep {{ border-left: 2px solid #c0c5d0; }}
+        .pt td.sep {{ border-left: 2px solid #eaecf0; }}
     </style>
     <table class="pt">
         <thead><tr>
             <th>Kategoria</th><th>Produkt (CR)</th>
-            <th>CR (PLN)</th><th>BD (EUR)</th><th>BD (~PLN @ {eur_rate:.2f})</th>
-            <th>Oszczędność (PLN)</th><th>Oszczędność (%)</th>
-            <th>Link CR</th><th>Link BD</th>
+            <th>CR (PLN)</th>
+            <th class="sep">BD (EUR)</th><th>BD (~PLN @ {eur_rate:.2f})</th><th>Oszcz. BD (PLN)</th><th>Oszcz. BD (%)</th>
+            <th class="sep">RW (PLN)</th><th>Oszcz. RW (PLN)</th><th>Oszcz. RW (%)</th>
+            <th class="sep">Link CR</th><th>Link BD</th><th>Link RW</th>
         </tr></thead>
         <tbody>{''.join(rows_html)}</tbody>
     </table>
     <p style="font-size:12px;color:#888;margin-top:8px">
-        💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło.
+        💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło. · RW = rowerowy.com (ceny PLN).
     </p>
     """
     st.markdown(table_html, unsafe_allow_html=True)
