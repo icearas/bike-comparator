@@ -20,7 +20,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🚵 Porównywarka cen części rowerowych")
+st.title("🚵 Bike Comparator")
 st.caption("centrumrowerowe.pl  vs  bike-discount.de")
 
 
@@ -58,14 +58,6 @@ with st.sidebar:
     )
 
     st.divider()
-    st.markdown(
-        """<a href="https://buycoffee.to/icearas" rel="noreferrer noopener" target="_blank">
-        <img src="https://buycoffee.to/btn/buycoffeeto-btn-primary.svg" style="width:180px">
-        </a>""",
-        unsafe_allow_html=True,
-    )
-
-    st.divider()
     st.header("🔍 Filtry")
 
     all_categories = sorted(df["category"].unique().tolist())
@@ -91,6 +83,14 @@ with st.sidebar:
         help="Ukryj produkty droższe lub równe w bike-discount.",
     )
 
+    st.divider()
+    st.header("🔎 Szukaj")
+    search_query = st.text_input(
+        "Wpisz nazwę produktu",
+        placeholder="np. Shimano, FOX 36, XT...",
+        help="Filtruje produkty po nazwie (CR lub BD).",
+    )
+
 # ── Obliczenia ────────────────────────────────────────────────────────────────
 filtered = df.copy()
 
@@ -102,6 +102,14 @@ filtered["oszczednosc_pln"] = (filtered["cr_price_pln"] - filtered["bd_price_pln
 filtered["oszczednosc_pct"] = (
     filtered["oszczednosc_pln"] / filtered["cr_price_pln"] * 100
 ).round(1)
+
+if search_query:
+    q = search_query.strip().lower()
+    mask = (
+        filtered["cr_name"].str.lower().str.contains(q, na=False)
+        | filtered["bd_name"].str.lower().str.contains(q, na=False)
+    )
+    filtered = filtered[mask]
 
 if only_cheaper:
     filtered = filtered[filtered["oszczednosc_pln"] > 0]
