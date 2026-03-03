@@ -6,10 +6,11 @@ Narzędzie do porównywania cen części rowerowych między sklepami internetowy
 
 ## 🛒 Obsługiwane sklepy
 
-| Sklep | Waluta |
-|-------|--------|
-| centrumrowerowe.pl | PLN |
-| bike-discount.de | EUR |
+| Sklep | Waluta | Rola |
+|-------|--------|------|
+| centrumrowerowe.pl | PLN | baza katalogu (CR) |
+| bike-discount.de | EUR | porównanie (BD) |
+| rowerowy.com | PLN | porównanie (RW) |
 
 ---
 
@@ -41,16 +42,19 @@ bike-comparator/
 ├── requirements.txt            # Zależności dla Streamlit Cloud
 ├── data/
 │   ├── cr_all.csv             # Pełny katalog CR po filtrach (generowany przez export_cr.py)
-│   └── matched_products.csv   # Dopasowania CR↔BD (generowane ręcznie po re-matchu)
+│   ├── matched_products.csv   # Dopasowania CR↔BD (generowane przez ai_matcher.py)
+│   └── rw_matched.csv         # Dopasowania CR↔RW (generowane przez rw_matcher.py)
 └── backend/
     ├── models.py               # Modele SQLAlchemy (SQLite)
-    ├── main.py                 # Orkiestracja scrapingu
+    ├── main.py                 # Orkiestracja scrapingu (CR + BD + RW)
     ├── seed_rules.py           # Wypełnienie reguł filtrowania
-    ├── ai_matcher.py           # Dopasowywanie produktów przez AI
+    ├── ai_matcher.py           # Dopasowywanie CR↔BD przez AI → DB
+    ├── rw_matcher.py           # Dopasowywanie CR↔RW przez AI → data/rw_matched.csv
     ├── export_cr.py            # Eksport filtrowanych produktów CR z DB → data/cr_all.csv
     └── scrapers/
         ├── centrum_rowerowe.py # Scraper centrumrowerowe.pl
-        └── bike_discount.py    # Scraper bike-discount.de
+        ├── bike_discount.py    # Scraper bike-discount.de
+        └── rowerowy.py         # Scraper rowerowy.com (infinite scroll, Playwright)
 ```
 
 ---
@@ -108,26 +112,20 @@ python models.py
 # Wypełnij reguły filtrowania
 python seed_rules.py
 
-# Uruchom scraping (zajmuje kilka minut)
+# Uruchom scraping wszystkich 3 sklepów (kilka–kilkanaście minut)
 python main.py
 
-# Uruchom dopasowywanie AI
+# Dopasuj CR↔BD (zapisuje do DB)
 python ai_matcher.py
 
-# Eksportuj katalog CR i dopasowania do CSV
-python export_cr.py
-cd ..
-python -c "
-import pandas as pd
-from backend.models import SessionLocal, MatchedProduct
-db = SessionLocal()
-rows = db.query(MatchedProduct).all()
-# ... lub użyj bezpośrednio matched_products z DB przez export ręczny
-db.close()
-"
-```
+# Dopasuj CR↔RW (zapisuje do data/rw_matched.csv)
+python rw_matcher.py
 
-> Prostszy sposób eksportu dopasowań — patrz sekcja **Przydatne komendy** poniżej.
+# Eksportuj katalog CR do CSV
+python export_cr.py
+
+# Eksportuj dopasowania CR↔BD do CSV (patrz Przydatne komendy)
+```
 
 ### Kolejne uruchomienia (odświeżenie cen)
 
@@ -135,17 +133,20 @@ db.close()
 cd backend
 source ../.venv/bin/activate
 
-# Odśwież ceny
+# Odśwież ceny (wszystkie 3 sklepy)
 python main.py
 
-# Wyczyść stare dopasowania i dopasuj ponownie
+# Wyczyść stare dopasowania CR↔BD i dopasuj ponownie
 python3 -c "from models import SessionLocal, MatchedProduct; db = SessionLocal(); db.query(MatchedProduct).delete(); db.commit(); db.close()"
 python ai_matcher.py
+
+# Dopasuj ponownie CR↔RW (nadpisuje rw_matched.csv)
+python rw_matcher.py
 
 # Eksportuj katalog CR do CSV
 python export_cr.py
 
-# Eksportuj dopasowania do data/matched_products.csv (patrz Przydatne komendy)
+# Eksportuj dopasowania CR↔BD do data/matched_products.csv (patrz Przydatne komendy)
 ```
 
 > ⚠️ Dopasowywanie AI wymaga stabilnego połączenia z Anthropic API. W razie problemów z siecią domową użyj mobilnego hotspotu.
@@ -195,15 +196,15 @@ Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
 
 ### Funkcje aplikacji
 
-- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach (136 produktów); BD match pokazywany tam gdzie istnieje
-- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu CR lub BD
+- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach (136 produktów); BD i RW match pokazywany tam gdzie istnieje
+- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu CR, BD lub RW
 - **Filtr kategorii** — pokaż tylko wybraną kategorię części
 - **Kurs EUR/PLN** — przelicz ceny BD na złotówki po aktualnym kursie
-- **Min. oszczędność (%)** — ukryj produkty poniżej zadanego progu
-- **Tylko tańsze w BD** — pokaż wyłącznie produkty opłacalne do zamówienia z Niemiec
-- **Tylko z matchem w BD** — ukryj produkty bez odpowiednika w bike-discount
-- **Metryki** — łączna liczba produktów CR, ile zmatchowanych, ile taniej w BD, średnia oszczędność
-- **Tabela z linkami** — bezpośrednie linki do produktu na obu sklepach; produkty zmatchowane na górze (wg oszczędności), niezmatchowane na dole
+- **Min. oszczędność (%)** — ukryj produkty poniżej zadanego progu (dotyczy BD)
+- **Tylko tańsze w BD / RW** — pokaż wyłącznie produkty opłacalne w danym sklepie
+- **Tylko z matchem w BD / RW** — ukryj produkty bez odpowiednika w danym sklepie
+- **Metryki** — liczba produktów CR, match BD i RW, ile taniej w BD/RW, średnia oszczędność
+- **Tabela z linkami** — kolumny BD i RW obok siebie; linki do produktu we wszystkich 3 sklepach
 
 ### Deploy na Streamlit Community Cloud (bezpłatny)
 
@@ -212,19 +213,21 @@ Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
 3. Kliknij **New app** → wskaż repo → ustaw **Main file path**: `app.py`
 4. Kliknij **Deploy**
 
-> Po każdym odświeżeniu cen: uruchom `python export_cr.py` i wyeksportuj `matched_products.csv`, zacommituj oba pliki i pushuj — Streamlit Cloud automatycznie pobierze nowe dane.
+> Po każdym odświeżeniu cen: uruchom `python export_cr.py`, `python rw_matcher.py` i wyeksportuj `matched_products.csv`, zacommituj wszystkie trzy pliki CSV i pushuj — Streamlit Cloud automatycznie pobierze nowe dane.
 
 ---
 
 ## 🤖 Jak działa dopasowywanie AI
 
+Dwa niezależne matchery: `ai_matcher.py` (CR↔BD, wyniki w DB) i `rw_matcher.py` (CR↔RW, wyniki w `data/rw_matched.csv`). Oba działają identycznie:
+
 1. Produkty są filtrowane przez reguły z tabeli `filter_rules` (tylko wybrane marki i grupy)
 2. Części serwisowe, narzędzia i akcesoria (klocki, linki, rebuild kity, narzędzia, tokeny, płyny itp.) są odrzucane przez rozszerzoną listę `SKIP_KEYWORDS`
-3. Dla każdego produktu z CR szukamy kandydatów z BD tej samej marki i kategorii
+3. Dla każdego produktu z CR szukamy kandydatów z BD/RW tej samej marki i kategorii
 4. Pre-filter po **grade zawieszenia** — FOX (Factory/Performance Elite/E-Optimized/Performance/Rhythm) i RockShox (Ultimate/Select+/Select/R) — zapobiega krzyżowaniu grade'ów; FOX bez grade'u (`fox_ungraded`) nie jest matchowany
 5. Pre-filter po numerach modelu (np. `RD-M8100`, `BL-M9220`) zawęża kandydatów do max 3 przed wywołaniem AI
 6. Claude Haiku ocenia czy dwa produkty to ten sam produkt (zwraca JSON z `same` i `confidence`); wersje dampera (Charger 3 vs Charger 3.1) traktowane jako różne produkty
-7. Dopasowania z confidence ≥ 95% są zapisywane do bazy
+7. Dopasowania z confidence ≥ 95% są zapisywane (CR↔BD → DB, CR↔RW → CSV)
 
 **Parametry matchera** (`ai_matcher.py`):
 
@@ -326,8 +329,9 @@ Apka jest publiczna (Settings → Sharing → Public w panelu Streamlit).
 
 ## 📝 TODO
 
-- [ ] Dodać trzeci sklep: bikeinn.com
-- [ ] Dodać czwarty sklep: sprint-rowery.pl
-- [ ] Poprawić matchowanie — więcej dopasowanych produktów
+- [ ] Dodać czwarty sklep: bikeinn.com lub sprint-rowery.pl
+- [ ] Ujednolicić nazwy produktów między sklepami (normalizacja nazw) — CR używa pełnych polskich nazw, RW skraca (np. "Przerzutka XT RD-M8100"), BD używa angielskich; utrudnia to matching i prezentację
+- [ ] Poprawić matchowanie — więcej dopasowanych produktów (szczególnie hamulce w RW)
 - [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)
 - [ ] Dodać pobieranie aktualnego kursu EUR/PLN z API
+- [ ] Refaktor DB — generyczny model dopasowań par sklepów (gdy pojawi się 4. sklep)
