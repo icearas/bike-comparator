@@ -36,6 +36,13 @@ last_updated = df["matched_at"].max()
 if pd.notna(last_updated):
     st.caption(f"Ostatnia aktualizacja danych: {last_updated.strftime('%d.%m.%Y')}")
 
+st.markdown(
+    """<a href="https://buycoffee.to/icearas" rel="noreferrer noopener" target="_blank">
+    <img src="https://buycoffee.to/btn/buycoffeeto-btn-primary.svg" style="height:36px">
+    </a>""",
+    unsafe_allow_html=True,
+)
+
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Ustawienia")
