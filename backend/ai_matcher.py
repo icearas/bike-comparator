@@ -111,7 +111,7 @@ def extract_suspension_grade(name: str) -> str | None:
         for grade in FOX_GRADES:
             if grade in name_lower:
                 return f"fox_{grade.replace(' ', '_')}"
-        return None
+        return "fox_ungraded"  # FOX bez grade → nie matchuj do żadnego konkretnego grade'u
     # RockShox — sprawdź dłuższe frazy przed krótszymi
     for grade in RS_GRADES:
         if grade in name_lower:
@@ -200,7 +200,7 @@ Rules:
 - Product type must match (single caliper ≠ brake set, front ≠ rear)
 - A brake set (lever + caliper) can match a product listing both parts (e.g. BL-M9220/BR-M9200)
 - Ignore cable length, color and speed count (11-speed, 12-speed) when model number matches
-- For suspension (forks/shocks): grade must match exactly — RockShox: Select ≠ Select+ ≠ Ultimate ≠ R; FOX: Factory ≠ Performance Elite ≠ Performance ≠ Performance E-Optimized ≠ Rhythm; ignore wheel size (27.5"/29"), travel (mm), and minor damper version (e.g. Charger 3 vs Charger 3.1) only when model AND grade match
+- For suspension (forks/shocks): grade must match exactly — RockShox: Select ≠ Select+ ≠ Ultimate ≠ R; FOX: Factory ≠ Performance Elite ≠ Performance ≠ Performance E-Optimized ≠ Rhythm; ignore wheel size (27.5"/29") and travel (mm) when model AND grade match; damper/cartridge version differences (e.g. Charger 3 vs Charger 3.1) count as different products
 Respond only with JSON, no explanation: {{"same": true/false, "confidence": 0.0-1.0}}"""
 
     for attempt in range(5):
