@@ -122,55 +122,43 @@ st.divider()
 if len(filtered) == 0:
     st.info("Brak produktów spełniających wybrane kryteria.")
 else:
-    display = filtered[[
-        "category",
-        "cr_name",
-        "cr_price_pln",
-        "bd_price_eur",
-        "bd_price_pln",
-        "oszczednosc_pln",
-        "oszczednosc_pct",
-        "cr_url",
-        "bd_url",
-    ]].copy()
+    rows_html = []
+    for _, row in filtered.iterrows():
+        color = "#1a7f37" if row["oszczednosc_pln"] > 0 else "#c0392b"
+        sign = "+" if row["oszczednosc_pln"] > 0 else ""
+        rows_html.append(f"""
+        <tr>
+            <td>{CATEGORY_LABELS.get(row['category'], row['category'])}</td>
+            <td>{row['cr_name']}</td>
+            <td style="text-align:right">{row['cr_price_pln']:.2f} zł</td>
+            <td style="text-align:right">{row['bd_price_eur']:.2f} €</td>
+            <td style="text-align:right">{row['bd_price_pln']:.2f} zł</td>
+            <td style="text-align:right;color:{color};font-weight:bold">{sign}{row['oszczednosc_pln']:.2f} zł</td>
+            <td style="text-align:right;color:{color};font-weight:bold">{sign}{row['oszczednosc_pct']:.1f}%</td>
+            <td style="text-align:center"><a href="{row['cr_url']}" rel="noreferrer noopener" target="_blank">CR 🔗</a></td>
+            <td style="text-align:center"><a href="{row['bd_url']}" rel="noreferrer noopener" target="_blank">BD 🔗</a></td>
+        </tr>""")
 
-    display["category"] = display["category"].map(
-        lambda x: CATEGORY_LABELS.get(x, x)
-    )
-
-    st.dataframe(
-        display,
-        use_container_width=True,
-        height=600,
-        column_config={
-            "category": st.column_config.TextColumn("Kategoria", width="small"),
-            "cr_name": st.column_config.TextColumn("Produkt (CR)", width="large"),
-            "cr_price_pln": st.column_config.NumberColumn(
-                "CR (PLN)", format="%.2f zł", width="small"
-            ),
-            "bd_price_eur": st.column_config.NumberColumn(
-                "BD (EUR)", format="%.2f €", width="small"
-            ),
-            "bd_price_pln": st.column_config.NumberColumn(
-                f"BD (~PLN @ {eur_rate:.2f})", format="%.2f zł", width="small"
-            ),
-            "oszczednosc_pln": st.column_config.NumberColumn(
-                "Oszczędność (PLN)", format="%.2f zł", width="small"
-            ),
-            "oszczednosc_pct": st.column_config.NumberColumn(
-                "Oszczędność (%)", format="%.1f%%", width="small"
-            ),
-            "cr_url": st.column_config.LinkColumn(
-                "Link CR", display_text="centrumrowerowe.pl", width="small"
-            ),
-            "bd_url": st.column_config.LinkColumn(
-                "Link BD", display_text="bike-discount.de", width="small"
-            ),
-        },
-        hide_index=True,
-    )
-
-    st.caption(
-        f"💡 Kurs EUR/PLN: {eur_rate:.2f} · "
-        "Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło."
-    )
+    table_html = f"""
+    <style>
+        .pt {{ width:100%; border-collapse:collapse; font-size:13px; }}
+        .pt th {{ background:#f0f2f6; padding:8px 10px; text-align:left; border-bottom:2px solid #d0d3da; white-space:nowrap; }}
+        .pt td {{ padding:6px 10px; border-bottom:1px solid #eaecf0; vertical-align:middle; }}
+        .pt tr:hover td {{ background:#f7f8fa; }}
+        .pt a {{ color:#0068c9; text-decoration:none; }}
+        .pt a:hover {{ text-decoration:underline; }}
+    </style>
+    <table class="pt">
+        <thead><tr>
+            <th>Kategoria</th><th>Produkt (CR)</th>
+            <th>CR (PLN)</th><th>BD (EUR)</th><th>BD (~PLN @ {eur_rate:.2f})</th>
+            <th>Oszczędność (PLN)</th><th>Oszczędność (%)</th>
+            <th>Link CR</th><th>Link BD</th>
+        </tr></thead>
+        <tbody>{''.join(rows_html)}</tbody>
+    </table>
+    <p style="font-size:12px;color:#888;margin-top:8px">
+        💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło.
+    </p>
+    """
+    st.markdown(table_html, unsafe_allow_html=True)
