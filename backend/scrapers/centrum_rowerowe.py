@@ -25,6 +25,9 @@ SUSPENSION_SKIP = [
     "revelation", "reba", "rudy", "judy",
     "deluxe", "monarch",
     "fox 32", "fox 34",
+    # Angielskie słowa serwisowe (zabezpieczenie na przyszłość)
+    "tool", "rebuild", "upgrade kit", "fluid", "pump",
+    "bushing", "flight attendant",
 ]
 
 ALLOWED_BRANDS = {

@@ -24,12 +24,69 @@ SKIP_KEYWORDS = [
     "śrubki", "srubki", "przymiar", "pulley", "pully", "cage",
     "klocki", "klocek", "okładziny", "okladziny", "linka", "pancerz",
     "płyn", "plyn", "zestaw do odpowietrzania", "seal kit", "spare",
-    "bolt", "screw", "plate", "set for", "puly", "kolka", "wozek",
+    "bolt", "screw", "plate", "set for", "puly", "kolka",  # "wozek" usunięty — duplikat
     "przerzutka przednia", "przednia shimano", "fd-", "kółko przerzutki",
     "tarcza", "rotor", "oneloc", "manetka blokady", "suntour", "sr suntour",
     "sora", "cs-hg50", "rock shox 35", "rockshox 35", "rock shox recon",
     "recon silver", "recon gold", "paragon", "domain", "microshift", "rd-t", "advent",
     " + ",  # produkty combo (np. kaseta + łańcuch) — nie mają odpowiednika w BD
+    # BD: narzędzia serwisowe
+    "tool",
+    # BD: zestawy do napraw i ulepszeń
+    "rebuild", "upgrade kit", "service kit",
+    # BD: płyny, pompy
+    "fluid", "pump",
+    # BD: małe części serwisowe zawieszeń
+    "wiper", "bushing", "lower leg", "crush washer",
+    # BD: tokeny powietrzne i spejsery objętości
+    "token", "volume spacer",
+    # BD: naklejki/kosmetyka
+    "decal", "sticker",
+    # BD: komponenty osi powietrznej
+    "air shaft", "air cap",
+    # BD: zawieszenie pod konkretne modele rowerów (nie mają odpowiednika w CR)
+    "flight attendant",
+    # BD: pojedyncze zębatki (nie całe kasety)
+    "sprocket",
+    # BD: lockringi z dystansami (części serwisowe)
+    "lock ring with",
+    # BD: zestawy zużycia (kaseta + łańcuch combo)
+    "wear and tear",
+    # BD: jednostki osi przerzutek (części)
+    "axle unit",
+    # CR: Fox 32/34 — BD nie ma tych modeli (odfiltrowane po stronie BD)
+    "fox racing shox 32", "fox racing shox 34",
+    # CR: części serwisowe zawieszenia przez polskie nazwy
+    "tokeny", "zestaw naprawczy", "zestaw montażowy", "zestaw czujników",
+    "pokrętło", "podkładka", "tuleje", "tulejka", "uchwyt", "spacer kit",
+    "upgrade kit fox", "kapa rock",
+    "odbojniki",                             # CR: odbojniki amortyzatora — akcesorium, nie widelec
+    "kontroler elektroniczny",               # CR: kontroler AXS/Flight Attendant — elektronika
+    # BD: części serwisowe zawieszenia, które ominęły SUSPENSION_SKIP (różne formy zapisu)
+    "servicekit",                            # "Fork ServiceKit" (bez spacji)
+    "vise block",                            # "Charger Vise Blocks", "SIDLuxe Vise Blocks"
+    "sealhead",                              # "Charger 2.1 Sealhead"
+    "seal head",                             # "ZEB DebonAir C1 Seal Head"
+    "knob",                                  # "Charger 3 RC2 Rebound Damper Knob"
+    "assy",                                  # "36/38 Grip Damper Shaft Assy"
+    "cartridge",                             # "Float GripX2 Cartridge"
+    "bumper stop",                           # "BoXXer Bumper Stop Kit", "40 Bumper Steering Stop"
+    "for deft", "for jab",                   # BD: zawieszenia pod konkretne rowery e-bike
+    # Modele poza zakresem — brak odpowiednika w BD lub celowo wykluczone
+    "revelation", "reba", "rudy", "judy",
+    "rock shox sid", "sid sl", "sidluxe",   # SID widelce i damper
+    "deluxe", "monarch",                     # stare/wykluczone szoki RS
+    "nx eagle",                              # SRAM NX — budżetowa linia poza zakresem
+]
+
+# Słowa kluczowe modeli zawieszenia — używane do pre-filtrowania kandydatów
+# Kolejność ważna: dłuższe frazy przed krótszymi (float x2 przed float x)
+SUSPENSION_MODEL_KEYWORDS = [
+    "float x2", "float dps", "float sl", "float x",
+    "dhx2", "dhx",
+    "vivid",
+    "boxxer",
+    "pike", "lyrik", "zeb", "yari", "psylo",
 ]
 
 BRAND_KEYWORDS = {
@@ -87,7 +144,7 @@ def extract_brand(name: str, url: str = "") -> str:
 
 
 def extract_model_numbers(name: str) -> list[str]:
-    """Wyciąga wszystkie numery modeli np. BL-M9220, BR-M9200, RD-M6100, BR-MT520, CS-HG81"""
+    """Wyciąga numery modeli (Shimano/SRAM) oraz nazwy modeli zawieszenia (Pike, Lyrik, ZEB itp.)"""
     name_upper = name.upper()
     # Standard: RD-M6100, BL-M9220, BR-M820 (0-1 litera po myślniku)
     results = re.findall(r'[A-Z]{1,3}-[A-Z]?\d{3,5}', name_upper)
@@ -97,6 +154,16 @@ def extract_model_numbers(name: str) -> list[str]:
     results += re.findall(r'X[GS]-\d{4}', name_upper)
     # Short codes: DB8, M6100
     results += re.findall(r'\b(DB\d+|M\d{4})\b', name_upper)
+    # Fox fork sizes: "FOX RACING SHOX 36 Float" → "36"
+    if "FOX" in name_upper:
+        fox_size = re.search(r'\b(36|38|40)\b', name_upper)
+        if fox_size:
+            results.append(fox_size.group(1))
+    # Suspension model keywords: Pike, Lyrik, ZEB, SIDLuxe, Vivid, Float X2 itp.
+    name_lower = name.lower()
+    for model in SUSPENSION_MODEL_KEYWORDS:
+        if model in name_lower:
+            results.append(model.upper())
     return list(set(results))
 
 
@@ -110,14 +177,19 @@ Rules:
 - Product type must match (single caliper ≠ brake set, front ≠ rear)
 - A brake set (lever + caliper) can match a product listing both parts (e.g. BL-M9220/BR-M9200)
 - Ignore cable length, color and speed count (11-speed, 12-speed) when model number matches
-JSON only: {{"same": true/false, "confidence": 0.0-1.0}}"""
+- For suspension (forks/shocks): grade must match exactly (Select ≠ Select+ ≠ Ultimate ≠ R); ignore wheel size (27.5"/29"), travel (mm), and minor damper version (e.g. Charger 3 vs Charger 3.1) only when model AND grade match
+Respond only with JSON, no explanation: {{"same": true/false, "confidence": 0.0-1.0}}"""
 
     for attempt in range(5):
         try:
-            resp = await client.messages.create(
-                model=MODEL,
-                max_tokens=50,
-                messages=[{"role": "user", "content": prompt}]
+            # FIX: timeout 30s — zapobiega nieskończonemu wiszeniu przy braku odpowiedzi API
+            resp = await asyncio.wait_for(
+                client.messages.create(
+                    model=MODEL,
+                    max_tokens=50,
+                    messages=[{"role": "user", "content": prompt}]
+                ),
+                timeout=30.0
             )
             raw = resp.content[0].text
             match = re.search(r'\{[^}]+\}', raw)
@@ -125,6 +197,10 @@ JSON only: {{"same": true/false, "confidence": 0.0-1.0}}"""
                 result = json.loads(match.group())
                 return result.get("same", False), result.get("confidence", 0.0)
             return False, 0.0
+        except asyncio.TimeoutError:
+            wait_sec = 5.0 * (attempt + 1)
+            print(f"  ⚠️ Claude err {attempt+1} (timeout 30s) — czekam {wait_sec:.0f}s")
+            await asyncio.sleep(wait_sec)
         except Exception as e:
             err_str = str(e)
             if "429" in err_str or "rate_limit" in err_str.lower() or "concurrent" in err_str.lower():
@@ -149,13 +225,17 @@ _rate_lock = asyncio.Lock()
 
 async def rate_limited_call(name_cr: str, name_bd: str, category: str) -> tuple[bool, float]:
     global _last_call
-    async with _rate_lock:  # lock trzymany przez cały call — tylko 1 połączenie na raz
+    # FIX: "ticket scheduling" — lock trzymany tylko przez chwilę (bez sleep w środku!)
+    # Każdy call dostaje zaplanowany czas startu, potem śpi poza lockiem
+    # → do PARALLEL_CALLS callów może spać równolegle i startować jednocześnie
+    async with _rate_lock:
         now = time.time()
-        wait = 1.3 - (now - _last_call)
-        if wait > 0:
-            await asyncio.sleep(wait)
-        _last_call = time.time()
-        return await are_same_product(name_cr, name_bd, category)
+        scheduled_at = max(now, _last_call + 1.3)
+        _last_call = scheduled_at
+    sleep_time = scheduled_at - time.time()
+    if sleep_time > 0:
+        await asyncio.sleep(sleep_time)  # sleep POZA lockiem — prawdziwy równoległy start
+    return await are_same_product(name_cr, name_bd, category)
 
 
 async def match_with_ai(limit: int = 300):
@@ -163,13 +243,15 @@ async def match_with_ai(limit: int = 300):
     print(f"🚀 MATCHER | Limit: {limit} | Start: {time.strftime('%H:%M:%S')}")
 
     db = SessionLocal()
-    rules = load_filter_rules(db)
+    try:
+        rules = load_filter_rules(db)
+        cr_products = db.query(Product).filter_by(shop="centrumrowerowe.pl").all()
+        bd_products = db.query(Product).filter_by(shop="bike-discount.de").all()
 
-    cr_products = db.query(Product).filter_by(shop="centrumrowerowe.pl").all()
-    bd_products = db.query(Product).filter_by(shop="bike-discount.de").all()
-
-    cr_main = [p for p in cr_products if is_main_product(p.name, p.category, rules, p.url or "")]
-    bd_main = [p for p in bd_products if is_main_product(p.name, p.category, rules, p.url or "")]
+        cr_main = [p for p in cr_products if is_main_product(p.name, p.category, rules, p.url or "")]
+        bd_main = [p for p in bd_products if is_main_product(p.name, p.category, rules, p.url or "")]
+    finally:
+        db.close()
 
     print(f"CR po filtrowaniu: {len(cr_main)} | BD po filtrowaniu: {len(bd_main)}")
 
@@ -184,80 +266,90 @@ async def match_with_ai(limit: int = 300):
 
     async def process_cr(i: int, cr: Product):
         nonlocal matched
+
+        # Semafora wokół całej funkcji — limituje do PARALLEL_CALLS równoległych tasków
+        # (nie 181 jednocześnie), ale ticket scheduling w rate_limited_call zapewnia
+        # że te 3 taski naprawdę startują API calle równolegle co 1.3s
         async with semaphore:
-            existing = db.query(MatchedProduct).filter_by(cr_product_id=cr.id).first()
-            if existing:
-                return
+            task_db = SessionLocal()
+            try:
+                existing = task_db.query(MatchedProduct).filter_by(cr_product_id=cr.id).first()
+                if existing:
+                    return
 
-            cr_brand = extract_brand(cr.name, cr.url)
-            bd_category = CATEGORY_MAP.get(cr.category, cr.category)
+                cr_brand = extract_brand(cr.name, cr.url)
+                bd_category = CATEGORY_MAP.get(cr.category, cr.category)
 
-            if cr.category in ("widelce", "dampery"):
-                candidates = (
-                    bd_by_brand_cat.get(("ROCKSHOX", bd_category), []) +
-                    bd_by_brand_cat.get(("FOX", bd_category), [])
-                )
-            else:
-                candidates = bd_by_brand_cat.get((cr_brand, bd_category), [])
-
-            if not candidates:
-                print(f"❌ [{i+1}] {cr.name[:50]} - brak kandydatów")
-                return
-
-            # Pre-filter po numerach modelu (obsługa wielu numerów np. BL-M9220 + BR-M9200)
-            cr_models = extract_model_numbers(cr.name)
-            if cr_models:
-                filtered = [bd for bd in candidates if any(m in bd.name.upper() for m in cr_models)]
-                if filtered:
-                    candidates = filtered[:3]
-                    print(f"🔍 [{i+1}] Pre-filter: {cr_models} → {len(candidates)} kandydatów")
-                else:
-                    candidates = candidates[:15]
-            else:
-                candidates = candidates[:15]
-
-            # Sekwencyjne sprawdzanie - stop na pewnym matchu
-            best_match = None
-            best_confidence = 0.0
-            for bd in candidates:
-                is_same, confidence = await rate_limited_call(cr.name, bd.name, cr.category)
-                if is_same and confidence >= CONFIDENCE_THRESHOLD:
-                    best_match = bd
-                    best_confidence = confidence
-                    break  # pierwszy dobry match wystarczy — pre-filter już wybrał kandydatów
-
-            if best_match:
-                existing_match = db.query(MatchedProduct).filter_by(
-                    cr_product_id=cr.id,
-                    bd_product_id=best_match.id
-                ).first()
-                if not existing_match:
-                    match_obj = MatchedProduct(
-                        name_normalized=cr.name,
-                        category=cr.category,
-                        cr_product_id=cr.id,
-                        cr_name=cr.name,
-                        cr_price_pln=cr.price,
-                        cr_url=cr.url,
-                        bd_product_id=best_match.id,
-                        bd_name=best_match.name,
-                        bd_price_eur=best_match.price,
-                        bd_url=best_match.url,
-                        match_method="ai_model_prefilter",
-                        match_confidence=best_confidence,
-                        matched_at=datetime.now(timezone.utc)
+                if cr.category in ("widelce", "dampery"):
+                    # CR przechowuje szoki (dampery) jako "widelce" (z amortyzatory scrape)
+                    # → szukamy w OBIE kategoriach BD: widelce i dampery
+                    # Pre-filter po słowach kluczowych (Pike/Vivid/Float X2 itp.) narowuje kandydatów
+                    candidates = (
+                        bd_by_brand_cat.get(("ROCKSHOX", "widelce"), []) +
+                        bd_by_brand_cat.get(("FOX", "widelce"), []) +
+                        bd_by_brand_cat.get(("ROCKSHOX", "dampery"), []) +
+                        bd_by_brand_cat.get(("FOX", "dampery"), [])
                     )
-                    db.add(match_obj)
-                    db.commit()
-                    matched += 1
-                    print(f"✅ [{i+1}] {cr.name[:40]} → {best_match.name[:40]} ({best_confidence:.0%})")
-            else:
-                print(f"❌ [{i+1}] {cr.name[:50]} - brak matcha")
+                else:
+                    candidates = bd_by_brand_cat.get((cr_brand, bd_category), [])
+
+                if not candidates:
+                    print(f"❌ [{i+1}] {cr.name[:50]} - brak kandydatów")
+                    return
+
+                # Pre-filter po numerach modelu (obsługa wielu numerów np. BL-M9220 + BR-M9200)
+                cr_models = extract_model_numbers(cr.name)
+                if cr_models:
+                    filtered = [bd for bd in candidates if any(m in bd.name.upper() for m in cr_models)]
+                    if filtered:
+                        candidates = filtered[:3]
+                        print(f"🔍 [{i+1}] Pre-filter: {cr_models} → {len(candidates)} kandydatów")
+                    else:
+                        candidates = candidates[:5]
+                else:
+                    candidates = candidates[:5]
+
+                best_match = None
+                best_confidence = 0.0
+                for bd in candidates:
+                    is_same, confidence = await rate_limited_call(cr.name, bd.name, cr.category)
+                    if is_same and confidence >= CONFIDENCE_THRESHOLD:
+                        best_match = bd
+                        best_confidence = confidence
+                        break  # pierwszy dobry match wystarczy — pre-filter już wybrał kandydatów
+
+                if best_match:
+                    existing_match = task_db.query(MatchedProduct).filter_by(
+                        cr_product_id=cr.id,
+                        bd_product_id=best_match.id
+                    ).first()
+                    if not existing_match:
+                        match_obj = MatchedProduct(
+                            name_normalized=cr.name,
+                            category=cr.category,
+                            cr_product_id=cr.id,
+                            cr_name=cr.name,
+                            cr_price_pln=cr.price,
+                            cr_url=cr.url,
+                            bd_product_id=best_match.id,
+                            bd_name=best_match.name,
+                            bd_price_eur=best_match.price,
+                            bd_url=best_match.url,
+                            match_method="ai_model_prefilter",
+                            match_confidence=best_confidence,
+                            matched_at=datetime.now(timezone.utc)
+                        )
+                        task_db.add(match_obj)
+                        task_db.commit()
+                        matched += 1
+                        print(f"✅ [{i+1}] {cr.name[:40]} → {best_match.name[:40]} ({best_confidence:.0%})")
+                else:
+                    print(f"❌ [{i+1}] {cr.name[:50]} - brak matcha")
+            finally:
+                task_db.close()
 
     tasks = [process_cr(i, cr) for i, cr in enumerate(cr_main[:limit])]
     await asyncio.gather(*tasks)
-
-    db.close()
 
     elapsed_min = (time.time() - start) / 60
     print(f"\n🎯 WYNIK: {matched} matchów | {elapsed_min:.1f} min")

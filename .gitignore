@@ -8,3 +8,15 @@ wheels/
 
 # Virtual environments
 .venv
+
+# macOS
+.DS_Store
+
+# Baza danych — lokalna, nie commitować
+backend/bike_comparator.db
+
+# Claude workspace
+.claude/
+
+# Zmienne środowiskowe
+.env

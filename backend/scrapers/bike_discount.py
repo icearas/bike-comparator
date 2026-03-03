@@ -55,13 +55,35 @@ ALLOWED_GROUPS = {
 }
 
 SUSPENSION_SKIP = [
-    "damper upgrade", "charger", "seal kit", "spare", "service kit",
+    "damper upgrade", "seal kit", "spare", "service kit",
     "oil", "grease", "bolt", "screw", "crown", "axle", "remote",
     "cable", "hose", "bleed", "spring", "foam ring",
     # Modele poza zakresem
     "revelation", "reba", "rudy", "judy",
     "deluxe", "monarch",
     "fox 32", "fox 34",
+    # Narzędzia serwisowe
+    "tool",
+    # Zestawy serwisowe i upgrade'y
+    "rebuild", "upgrade kit",
+    # Płyny
+    "fluid",
+    # Pompy
+    "pump",
+    # Uszczelki, tuleje, małe części
+    "wiper", "bushing", "lower leg",
+    # Sprzęt (podkładki)
+    "crush washer",
+    # Tokeny powietrzne i spejsery
+    "token", "volume spacer",
+    # Naklejki / kosmetyka
+    "decal", "sticker",
+    # Komponenty osi powietrznej (części serwisowe)
+    "air shaft", "air cap",
+    # Nakrętki i kapsle widelca
+    "topcap", "top cap", "forkcap",
+    # Zawieszenia pod konkretne modele rowerów (brak odpowiednika w CR)
+    "flight attendant",
 ]
 
 SHIMANO_OLD_MODELS = {

@@ -1,6 +1,6 @@
 # 🚵 Bike Parts Price Comparator
 
-Narzędzie do porównywania cen części rowerowych między sklepami internetowymi. Automatycznie scrape'uje produkty, dopasowuje je przy użyciu AI i prezentuje różnice cenowe.
+Narzędzie do porównywania cen części rowerowych między sklepami internetowymi. Automatycznie scrape'uje produkty, dopasowuje je przy użyciu AI i prezentuje różnice cenowe w aplikacji webowej Streamlit.
 
 ---
 
@@ -25,8 +25,6 @@ Narzędzie do porównywania cen części rowerowych między sklepami internetowy
 | Kasety | SRAM | Eagle 70/90, GX, NX, X01, XX1 |
 | Łańcuchy | Shimano | Deore, SLX, XT, XTR |
 | Łańcuchy | SRAM | Eagle (wszystkie) |
-| Manetki | Shimano | Deore, SLX, XT, XTR, Saint |
-| Manetki | SRAM | Eagle 70/90, GX, NX, X01, XX1 |
 | Widelce | RockShox | Wszystkie modele |
 | Widelce | FOX | Wszystkie modele |
 | Dampery | RockShox | Wszystkie modele |
@@ -39,15 +37,19 @@ Narzędzie do porównywania cen części rowerowych między sklepami internetowy
 ```
 bike-comparator/
 ├── .env                        # Klucz API Anthropic (nie commitować!)
-├── backend/
-│   ├── models.py               # Modele SQLAlchemy (SQLite)
-│   ├── main.py                 # Orkiestracja scrapingu
-│   ├── seed_rules.py           # Wypełnienie reguł filtrowania
-│   ├── ai_matcher.py           # Dopasowywanie produktów przez AI
-│   └── scrapers/
-│       ├── centrum_rowerowe.py # Scraper centrumrowerowe.pl
-│       └── bike_discount.py    # Scraper bike-discount.de
-└── frontend/                   # (w budowie)
+├── app.py                      # Aplikacja Streamlit (frontend)
+├── export_data.py              # Eksport dopasowań z SQLite → CSV
+├── requirements.txt            # Zależności dla Streamlit Cloud
+├── data/
+│   └── matched_products.csv   # Dane do aplikacji (generowane przez export_data.py)
+└── backend/
+    ├── models.py               # Modele SQLAlchemy (SQLite)
+    ├── main.py                 # Orkiestracja scrapingu
+    ├── seed_rules.py           # Wypełnienie reguł filtrowania
+    ├── ai_matcher.py           # Dopasowywanie produktów przez AI
+    └── scrapers/
+        ├── centrum_rowerowe.py # Scraper centrumrowerowe.pl
+        └── bike_discount.py    # Scraper bike-discount.de
 ```
 
 ---
@@ -69,7 +71,6 @@ SQLite (`backend/bike_comparator.db`) z tabelami:
 ### Wymagania
 
 - Python 3.12+
-- Node.js 25+
 
 ### Instalacja
 
@@ -81,7 +82,7 @@ cd bike-comparator
 # Utwórz venv i zainstaluj zależności
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install playwright beautifulsoup4 fastapi uvicorn sqlalchemy httpx anthropic python-dotenv requests
+pip install playwright beautifulsoup4 sqlalchemy httpx anthropic python-dotenv requests streamlit pandas
 
 # Zainstaluj Chromium dla Playwright
 playwright install chromium
@@ -94,10 +95,11 @@ echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
 
 ## 🚀 Uruchomienie
 
-### Pierwsze uruchomienie
+### Pierwsze uruchomienie (od zera)
 
 ```bash
 cd backend
+source ../.venv/bin/activate
 
 # Utwórz bazę danych
 python models.py
@@ -110,6 +112,10 @@ python main.py
 
 # Uruchom dopasowywanie AI
 python ai_matcher.py
+
+# Eksportuj dopasowania do CSV
+cd ..
+python export_data.py
 ```
 
 ### Kolejne uruchomienia (odświeżenie cen)
@@ -124,11 +130,15 @@ python main.py
 # Wyczyść stare dopasowania i dopasuj ponownie
 python3 -c "from models import SessionLocal, MatchedProduct; db = SessionLocal(); db.query(MatchedProduct).delete(); db.commit(); db.close()"
 python ai_matcher.py
+
+# Eksportuj do CSV
+cd ..
+python export_data.py
 ```
 
 > ⚠️ Dopasowywanie AI wymaga stabilnego połączenia z Anthropic API. W razie problemów z siecią domową użyj mobilnego hotspotu.
 
-### Reset matcha — pełne odświeżenie CR (gdy zmieniły się reguły scrapera)
+### Reset matcha — pełne odświeżenie produktów (gdy zmieniły się reguły scrapera)
 
 Jeśli zmieniły się wykluczenia w scraper'ze (np. `SHIMANO_OLD_MODELS`, `SKIP_KEYWORDS`) i chcesz, żeby baza odzwierciedlała aktualny stan — **samo `python main.py` nie wystarczy**, bo `save_products()` używa upsert (nie usuwa starych rekordów).
 
@@ -149,25 +159,77 @@ python main.py
 
 # 4. Re-match
 python ai_matcher.py
+
+# 5. Eksportuj do CSV
+cd ..
+python export_data.py
 ```
 
-> ⚠️ Produkty BD (`bike-discount.de`) nie wymagają czyszczenia — ich reguły nie zmieniają się.
+> ⚠️ Jeśli zmieniły się reguły w scraperze BD (np. `SUSPENSION_SKIP`, `ALLOWED_GROUPS`) — należy wyczyścić i ponownie zescrapować również produkty BD, zastępując `centrumrowerowe.pl` przez `bike-discount.de` w krokach powyżej.
+
+---
+
+## 🖥 Aplikacja Streamlit
+
+### Uruchomienie lokalne
+
+```bash
+source .venv/bin/activate
+streamlit run app.py
+```
+
+Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
+
+### Funkcje aplikacji
+
+- **Filtr kategorii** — pokaż tylko wybraną kategorię części
+- **Kurs EUR/PLN** — przelicz ceny BD na złotówki po aktualnym kursie
+- **Min. oszczędność (%)** — ukryj produkty poniżej zadanego progu
+- **Tylko tańsze w BD** — pokaż wyłącznie produkty opłacalne do zamówienia z Niemiec
+- **Metryki** — liczba dopasowań, ile taniej w BD, średnia i max oszczędność
+- **Tabela z linkami** — bezpośrednie linki do produktu na obu sklepach
+
+### Deploy na Streamlit Community Cloud (bezpłatny)
+
+1. Upewnij się, że w repo jest aktualny `data/matched_products.csv` (wygenerowany przez `export_data.py`)
+2. Wejdź na [share.streamlit.io](https://share.streamlit.io) i zaloguj się przez GitHub
+3. Kliknij **New app** → wskaż repo → ustaw **Main file path**: `app.py`
+4. Kliknij **Deploy**
+
+> Po każdym odświeżeniu cen: uruchom `python export_data.py`, zacommituj i pushuj zaktualizowany CSV — Streamlit Cloud automatycznie pobierze nowe dane.
 
 ---
 
 ## 🤖 Jak działa dopasowywanie AI
 
 1. Produkty są filtrowane przez reguły z tabeli `filter_rules` (tylko wybrane marki i grupy)
-2. Akcesoria (klocki, linki, płyny itp.) są odrzucane przez listę `SKIP_KEYWORDS`
+2. Części serwisowe, narzędzia i akcesoria (klocki, linki, rebuild kity, narzędzia, tokeny, płyny itp.) są odrzucane przez rozszerzoną listę `SKIP_KEYWORDS`
 3. Dla każdego produktu z CR szukamy kandydatów z BD tej samej marki i kategorii
-4. Claude Haiku ocenia czy dwa produkty to ten sam produkt (zwraca JSON z `same` i `confidence`)
-5. Dopasowania z confidence ≥ 92% są zapisywane do bazy
+4. Pre-filter po numerach modelu (np. `RD-M8100`, `BL-M9220`) zawęża kandydatów do max 3 przed wywołaniem AI
+5. Claude Haiku ocenia czy dwa produkty to ten sam produkt (zwraca JSON z `same` i `confidence`)
+6. Dopasowania z confidence ≥ 95% są zapisywane do bazy
+
+**Parametry matchera** (`ai_matcher.py`):
+
+| Parametr | Wartość | Opis |
+|----------|---------|------|
+| `CONFIDENCE_THRESHOLD` | 0.95 | Minimalny próg pewności dopasowania |
+| `PARALLEL_CALLS` | 3 | Liczba równoległych wywołań Claude API |
+| `MODEL` | claude-haiku-4-5 | Model używany do porównań |
 
 ---
 
 ## 🛠 Przydatne komendy
 
-### Eksport produktów do CSV
+### Eksport dopasowań do CSV (dla Streamlit)
+
+```bash
+cd ~/bike-comparator
+source .venv/bin/activate
+python export_data.py
+```
+
+### Eksport surowych produktów do CSV (diagnostyka)
 
 ```bash
 cd ~/bike-comparator/backend
@@ -214,9 +276,6 @@ python main.py
 
 - [ ] Dodać trzeci sklep: bikeinn.com
 - [ ] Dodać czwarty sklep: sprint-rowery.pl
-- [ ] Zbudować FastAPI backend z endpointami
-- [ ] Zbudować React frontend z tabelą porównań
-- [ ] Dodać automatyczne odświeżanie cen (cron)
-- [ ] Dodać kursy walut PLN/EUR
+- [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)
+- [ ] Dodać pobieranie aktualnego kursu EUR/PLN z API
 - [ ] Dodać banner "Buy me a coffee"
-- [ ] zamiast FastAPI uzyc Streamlit
