@@ -83,13 +83,11 @@ with st.sidebar:
         help="Ukryj produkty droższe lub równe w bike-discount.",
     )
 
-    st.divider()
-    st.header("🔎 Szukaj")
-    search_query = st.text_input(
-        "Wpisz nazwę produktu",
-        placeholder="np. Shimano, FOX 36, XT...",
-        help="Filtruje produkty po nazwie (CR lub BD).",
-    )
+search_query = st.text_input(
+    "🔎 Szukaj produktu",
+    placeholder="np. Shimano, FOX 36, XT...",
+    help="Filtruje produkty po nazwie (CR lub BD).",
+)
 
 # ── Obliczenia ────────────────────────────────────────────────────────────────
 filtered = df.copy()
