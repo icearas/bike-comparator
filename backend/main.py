@@ -3,6 +3,7 @@ import time
 from models import SessionLocal, Product, init_db
 from scrapers.centrum_rowerowe import scrape_category as scrape_cr
 from scrapers.bike_discount import scrape_category as scrape_bd
+from scrapers.rowerowy import scrape_category as scrape_rw
 from datetime import datetime
 
 
@@ -36,25 +37,37 @@ def save_products(products: list[dict]):
 
 
 async def scrape_all():
-    categories = ["przerzutki", "hamulce", "kasety", "lancuchy", "manetki", "amortyzatory", "widelce", "dampery"]
-    
+    cr_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "manetki", "amortyzatory", "widelce", "dampery"]
+    bd_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "widelce", "dampery"]
+    rw_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "amortyzatory", "dampery"]
+
     total_start = time.time()
-    
-    for category in categories:
+
+    all_categories = sorted(set(cr_categories + bd_categories + rw_categories))
+    for category in all_categories:
         print(f"\n=== Scrapuję kategorię: {category} ===")
         cat_start = time.time()
 
-        try:
-            products = await scrape_cr(category, max_pages=15)
-            save_products(products)
-        except Exception as e:
-            print(f"Błąd CR ({category}): {e}")
+        if category in cr_categories:
+            try:
+                products = await scrape_cr(category, max_pages=15)
+                save_products(products)
+            except Exception as e:
+                print(f"Błąd CR ({category}): {e}")
 
-        try:
-            products = await scrape_bd(category, max_pages=10)
-            save_products(products)
-        except Exception as e:
-            print(f"Błąd BD ({category}): {e}")
+        if category in bd_categories:
+            try:
+                products = await scrape_bd(category, max_pages=10)
+                save_products(products)
+            except Exception as e:
+                print(f"Błąd BD ({category}): {e}")
+
+        if category in rw_categories:
+            try:
+                products = await scrape_rw(category)
+                save_products(products)
+            except Exception as e:
+                print(f"Błąd RW ({category}): {e}")
 
         cat_time = time.time() - cat_start
         print(f"⏱️  {category}: {cat_time:.1f}s")
