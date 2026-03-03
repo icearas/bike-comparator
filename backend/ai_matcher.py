@@ -98,6 +98,29 @@ BRAND_KEYWORDS = {
 
 CATEGORY_MAP = {"amortyzatory": "widelce"}
 
+# FOX grades (od najwyższego): Factory > Performance Elite > Performance E-Optimized > Performance > Rhythm
+# RockShox grades (od najwyższego): Ultimate > Select+ > Select > R
+FOX_GRADES = ["factory", "performance elite", "e-optimized", "performance", "rhythm"]
+RS_GRADES = ["ultimate", "select+", "select"]
+
+
+def extract_suspension_grade(name: str) -> str | None:
+    """Wyciąga grade produktu zawieszenia. Zwraca None jeśli nie rozpoznano."""
+    name_lower = name.lower()
+    if "fox" in name_lower:
+        for grade in FOX_GRADES:
+            if grade in name_lower:
+                return f"fox_{grade.replace(' ', '_')}"
+        return None
+    # RockShox — sprawdź dłuższe frazy przed krótszymi
+    for grade in RS_GRADES:
+        if grade in name_lower:
+            return f"rs_{grade.replace('+', 'plus').replace(' ', '_')}"
+    # Standalone "R" na końcu (np. "ZEB R", "Pike R") — bez fałszywych trafień
+    if re.search(r'\bR\b', name.upper()):
+        return "rs_r"
+    return None
+
 
 def load_filter_rules(db) -> list:
     return db.query(FilterRule).filter_by(active=1).all()
@@ -177,7 +200,7 @@ Rules:
 - Product type must match (single caliper ≠ brake set, front ≠ rear)
 - A brake set (lever + caliper) can match a product listing both parts (e.g. BL-M9220/BR-M9200)
 - Ignore cable length, color and speed count (11-speed, 12-speed) when model number matches
-- For suspension (forks/shocks): grade must match exactly (Select ≠ Select+ ≠ Ultimate ≠ R); ignore wheel size (27.5"/29"), travel (mm), and minor damper version (e.g. Charger 3 vs Charger 3.1) only when model AND grade match
+- For suspension (forks/shocks): grade must match exactly — RockShox: Select ≠ Select+ ≠ Ultimate ≠ R; FOX: Factory ≠ Performance Elite ≠ Performance ≠ Performance E-Optimized ≠ Rhythm; ignore wheel size (27.5"/29"), travel (mm), and minor damper version (e.g. Charger 3 vs Charger 3.1) only when model AND grade match
 Respond only with JSON, no explanation: {{"same": true/false, "confidence": 0.0-1.0}}"""
 
     for attempt in range(5):
@@ -283,13 +306,20 @@ async def match_with_ai(limit: int = 300):
                 if cr.category in ("widelce", "dampery"):
                     # CR przechowuje szoki (dampery) jako "widelce" (z amortyzatory scrape)
                     # → szukamy w OBIE kategoriach BD: widelce i dampery
-                    # Pre-filter po słowach kluczowych (Pike/Vivid/Float X2 itp.) narowuje kandydatów
                     candidates = (
-                        bd_by_brand_cat.get(("ROCKSHOX", "widelce"), []) +
-                        bd_by_brand_cat.get(("FOX", "widelce"), []) +
-                        bd_by_brand_cat.get(("ROCKSHOX", "dampery"), []) +
-                        bd_by_brand_cat.get(("FOX", "dampery"), [])
+                        bd_by_brand_cat.get((cr_brand, "widelce"), []) +
+                        bd_by_brand_cat.get((cr_brand, "dampery"), [])
                     )
+                    # Pre-filter po grade (Factory ≠ Performance ≠ Rhythm, Select ≠ Ultimate ≠ R)
+                    cr_grade = extract_suspension_grade(cr.name)
+                    if cr_grade:
+                        grade_filtered = [bd for bd in candidates if extract_suspension_grade(bd.name) == cr_grade]
+                        if grade_filtered:
+                            candidates = grade_filtered
+                        else:
+                            # BD nie ma tego grade'u — brak matcha
+                            print(f"❌ [{i+1}] {cr.name[:50]} - BD nie ma grade '{cr_grade}'")
+                            return
                 else:
                     candidates = bd_by_brand_cat.get((cr_brand, bd_category), [])
 
