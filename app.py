@@ -51,6 +51,14 @@ with st.sidebar:
     )
 
     st.divider()
+    st.markdown(
+        """<a href="https://buycoffee.to/icearas" rel="noreferrer noopener" target="_blank">
+        <img src="https://buycoffee.to/btn/buycoffeeto-btn-primary.svg" style="width:180px">
+        </a>""",
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
     st.header("🔍 Filtry")
 
     all_categories = sorted(df["category"].unique().tolist())
