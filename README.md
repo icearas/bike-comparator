@@ -272,10 +272,25 @@ python main.py
 
 ---
 
+## 🌐 Deploy
+
+Aplikacja działa na Streamlit Community Cloud:
+`https://bike-comparator-bhwfr2hvgau63gr6cbfvse.streamlit.app`
+
+Repo jest **prywatne** — Streamlit ma dostęp przez GitHub OAuth (połączone konto `icearas`).
+Apka jest publiczna (Settings → Sharing → Public w panelu Streamlit).
+
+### Uwagi deployment
+- `uv.lock` **nie jest w repo** — Streamlit używa tylko `requirements.txt`
+- `.python-version` = `3.12`, `pyproject.toml` `requires-python = ">=3.12"`
+- Linki w tabeli używają `rel="noreferrer noopener"` — centrumrowerowe.pl blokuje ruch z referrerem `streamlit.app`
+
+---
+
 ## 📝 TODO
 
 - [ ] Dodać trzeci sklep: bikeinn.com
 - [ ] Dodać czwarty sklep: sprint-rowery.pl
+- [ ] Poprawić matchowanie — więcej dopasowanych produktów
 - [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)
 - [ ] Dodać pobieranie aktualnego kursu EUR/PLN z API
-- [ ] Dodać banner "Buy me a coffee"
