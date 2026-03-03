@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 
-DATA_PATH = Path(__file__).parent / "data" / "matched_products.csv"
+CR_ALL_PATH = Path(__file__).parent / "data" / "cr_all.csv"
+MATCHED_PATH = Path(__file__).parent / "data" / "matched_products.csv"
 
 CATEGORY_LABELS = {
     "hamulce": "Hamulce",
@@ -26,9 +27,14 @@ st.caption("centrumrowerowe.pl  vs  bike-discount.de")
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
-    df = pd.read_csv(DATA_PATH)
-    df["matched_at"] = pd.to_datetime(df["matched_at"], utc=True, errors="coerce")
-    return df
+    cr = pd.read_csv(CR_ALL_PATH)
+    cr = cr.rename(columns={"name": "cr_name", "price": "cr_price_pln", "url": "cr_url"})
+
+    matched = pd.read_csv(MATCHED_PATH)
+    matched["matched_at"] = pd.to_datetime(matched["matched_at"], utc=True, errors="coerce")
+    matched = matched[["cr_url", "bd_name", "bd_price_eur", "bd_url", "matched_at"]]
+
+    return cr.merge(matched, on="cr_url", how="left")
 
 
 df = load_data()
@@ -61,9 +67,7 @@ with st.sidebar:
     st.header("🔍 Filtry")
 
     all_categories = sorted(df["category"].unique().tolist())
-    category_display = ["Wszystkie"] + [
-        CATEGORY_LABELS.get(c, c) for c in all_categories
-    ]
+    category_display = ["Wszystkie"] + [CATEGORY_LABELS.get(c, c) for c in all_categories]
     category_map = {CATEGORY_LABELS.get(c, c): c for c in all_categories}
 
     selected_label = st.selectbox("Kategoria", category_display)
@@ -81,6 +85,12 @@ with st.sidebar:
         "Tylko tańsze w BD",
         value=False,
         help="Ukryj produkty droższe lub równe w bike-discount.",
+    )
+
+    only_matched = st.checkbox(
+        "Tylko z matchem w BD",
+        value=False,
+        help="Ukryj produkty bez odpowiednika w bike-discount.",
     )
 
 search_query = st.text_input(
@@ -109,32 +119,33 @@ if search_query:
     )
     filtered = filtered[mask]
 
+if only_matched:
+    filtered = filtered[filtered["bd_price_eur"].notna()]
+
 if only_cheaper:
     filtered = filtered[filtered["oszczednosc_pln"] > 0]
 
 if min_savings_pct > 0:
     filtered = filtered[filtered["oszczednosc_pct"] >= min_savings_pct]
-filtered = filtered.sort_values("oszczednosc_pct", ascending=False)
+
+# Posortuj: zmatchowane najpierw (wg oszczędności malejąco), potem niezmatchowane
+matched_rows = filtered[filtered["bd_price_eur"].notna()].sort_values("oszczednosc_pct", ascending=False)
+unmatched_rows = filtered[filtered["bd_price_eur"].isna()].sort_values("cr_price_pln", ascending=False)
+filtered = pd.concat([matched_rows, unmatched_rows])
 
 # ── Metryki ───────────────────────────────────────────────────────────────────
 c1, c2, c3, c4 = st.columns(4)
 
+matched_count = filtered["bd_price_eur"].notna().sum()
 taniej_count = (filtered["oszczednosc_pln"] > 0).sum()
 avg_savings = filtered.loc[filtered["oszczednosc_pln"] > 0, "oszczednosc_pct"].mean()
-max_savings = filtered["oszczednosc_pct"].max()
 
-c1.metric("Dopasowanych produktów", len(filtered))
-c2.metric(
-    "Taniej w BD",
-    f"{taniej_count} / {len(filtered)}",
-)
-c3.metric(
+c1.metric("Produktów CR", len(filtered))
+c2.metric("Z matchem w BD", f"{matched_count} / {len(filtered)}")
+c3.metric("Taniej w BD", str(taniej_count))
+c4.metric(
     "Śr. oszczędność",
     f"{avg_savings:.1f}%" if pd.notna(avg_savings) else "—",
-)
-c4.metric(
-    "Max oszczędność",
-    f"{max_savings:.1f}%" if pd.notna(max_savings) and len(filtered) > 0 else "—",
 )
 
 st.divider()
@@ -145,19 +156,35 @@ if len(filtered) == 0:
 else:
     rows_html = []
     for _, row in filtered.iterrows():
-        color = "#1a7f37" if row["oszczednosc_pln"] > 0 else "#c0392b"
-        sign = "+" if row["oszczednosc_pln"] > 0 else ""
+        has_bd = pd.notna(row.get("bd_price_eur"))
+        cr_link = f'<a href="{row["cr_url"]}" rel="noreferrer noopener" target="_blank">CR 🔗</a>' if row.get("cr_url") else "—"
+
+        if has_bd:
+            color = "#1a7f37" if row["oszczednosc_pln"] > 0 else "#c0392b"
+            sign = "+" if row["oszczednosc_pln"] > 0 else ""
+            bd_eur = f"{row['bd_price_eur']:.2f} €"
+            bd_pln = f"{row['bd_price_pln']:.2f} zł"
+            sav_pln = f'<td style="text-align:right;color:{color};font-weight:bold">{sign}{row["oszczednosc_pln"]:.2f} zł</td>'
+            sav_pct = f'<td style="text-align:right;color:{color};font-weight:bold">{sign}{row["oszczednosc_pct"]:.1f}%</td>'
+            bd_link = f'<a href="{row["bd_url"]}" rel="noreferrer noopener" target="_blank">BD 🔗</a>'
+        else:
+            bd_eur = "—"
+            bd_pln = "—"
+            sav_pln = '<td style="text-align:right;color:#aaa">—</td>'
+            sav_pct = '<td style="text-align:right;color:#aaa">—</td>'
+            bd_link = '<span style="color:#aaa">—</span>'
+
         rows_html.append(f"""
         <tr>
             <td>{CATEGORY_LABELS.get(row['category'], row['category'])}</td>
             <td>{row['cr_name']}</td>
             <td style="text-align:right">{row['cr_price_pln']:.2f} zł</td>
-            <td style="text-align:right">{row['bd_price_eur']:.2f} €</td>
-            <td style="text-align:right">{row['bd_price_pln']:.2f} zł</td>
-            <td style="text-align:right;color:{color};font-weight:bold">{sign}{row['oszczednosc_pln']:.2f} zł</td>
-            <td style="text-align:right;color:{color};font-weight:bold">{sign}{row['oszczednosc_pct']:.1f}%</td>
-            <td style="text-align:center"><a href="{row['cr_url']}" rel="noreferrer noopener" target="_blank">CR 🔗</a></td>
-            <td style="text-align:center"><a href="{row['bd_url']}" rel="noreferrer noopener" target="_blank">BD 🔗</a></td>
+            <td style="text-align:right">{bd_eur}</td>
+            <td style="text-align:right">{bd_pln}</td>
+            {sav_pln}
+            {sav_pct}
+            <td style="text-align:center">{cr_link}</td>
+            <td style="text-align:center">{bd_link}</td>
         </tr>""")
 
     table_html = f"""
