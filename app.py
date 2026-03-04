@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 import urllib.request
+import urllib.parse
 import json
 
 CR_ALL_PATH = Path(__file__).parent / "data" / "cr_all.csv"
@@ -26,6 +27,14 @@ st.set_page_config(
 
 st.title("🚵 Bike Comparator")
 st.caption("centrumrowerowe.pl  vs  bike-discount.de  vs  rowerowy.com")
+
+
+def allegro_url(cr_name: str) -> str:
+    # Wyciągnij numer modelu jeśli istnieje (np. RD-M8100, CS-M8100, BL-M9220)
+    import re
+    m = re.search(r'[A-Z]{2,3}-[A-Z]?\d{4,6}', cr_name.upper())
+    query = m.group(0) if m else cr_name
+    return f"https://allegro.pl/listing?string={urllib.parse.quote_plus(query)}&order=p&stan=nowe"
 
 
 @st.cache_data(ttl=3600)
@@ -159,6 +168,7 @@ else:
         has_bd = pd.notna(row.get("bd_price_eur"))
         has_rw = pd.notna(row.get("rw_price_pln"))
         cr_link = f'<a href="{row["cr_url"]}" rel="noreferrer noopener" target="_blank">CR 🔗</a>' if row.get("cr_url") else "—"
+        al_link = f'<a href="{allegro_url(row["cr_name"])}" rel="noreferrer noopener" target="_blank">AL 🔗</a>'
 
         if has_bd:
             color_bd = "#1a7f37" if row["oszczednosc_pln"] > 0 else "#c0392b"
@@ -203,6 +213,7 @@ else:
             <td style="text-align:center">{cr_link}</td>
             <td style="text-align:center">{bd_link}</td>
             <td style="text-align:center">{rw_link}</td>
+            <td style="text-align:center">{al_link}</td>
         </tr>""")
 
     table_html = f"""
@@ -223,7 +234,7 @@ else:
             <th>CR (PLN)</th>
             <th class="sep">BD (EUR)</th><th>BD (~PLN @ {eur_rate:.2f})</th><th>Oszcz. BD (PLN)</th><th>Oszcz. BD (%)</th>
             <th class="sep">RW (PLN)</th><th>Oszcz. RW (PLN)</th><th>Oszcz. RW (%)</th>
-            <th class="sep">Link CR</th><th>Link BD</th><th>Link RW</th>
+            <th class="sep">Link CR</th><th>Link BD</th><th>Link RW</th><th>Link AL</th>
         </tr></thead>
         <tbody>{''.join(rows_html)}</tbody>
     </table>
