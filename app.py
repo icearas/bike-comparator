@@ -239,7 +239,7 @@ else:
         <tbody>{''.join(rows_html)}</tbody>
     </table>
     <p style="font-size:12px;color:#888;margin-top:8px">
-        💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło. · RW = rowerowy.com (ceny PLN).
+        💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło. · RW = rowerowy.com (ceny PLN). · made by <a href="https://buycoffee.to/icearas" rel="noreferrer noopener" target="_blank" style="color:#888">icearas</a>
     </p>
     </div>
     """
