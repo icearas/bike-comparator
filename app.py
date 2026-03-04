@@ -163,24 +163,6 @@ matched_rows = filtered[filtered["bd_price_eur"].notna()].sort_values("oszczedno
 unmatched_rows = filtered[filtered["bd_price_eur"].isna()].sort_values("cr_price_pln", ascending=False)
 filtered = pd.concat([matched_rows, unmatched_rows])
 
-# ── Metryki ───────────────────────────────────────────────────────────────────
-c1, c2, c3, c4, c5, c6 = st.columns(6)
-
-matched_bd_count = filtered["bd_price_eur"].notna().sum()
-matched_rw_count = filtered["rw_price_pln"].notna().sum()
-taniej_bd = (filtered["oszczednosc_pln"] > 0).sum()
-taniej_rw = (filtered["rw_oszczednosc_pln"] > 0).sum()
-avg_sav_bd = filtered.loc[filtered["oszczednosc_pln"] > 0, "oszczednosc_pct"].mean()
-avg_sav_rw = filtered.loc[filtered["rw_oszczednosc_pln"] > 0, "rw_oszczednosc_pct"].mean()
-
-c1.metric("Produktów CR", len(filtered))
-c2.metric("Match BD", f"{matched_bd_count} / {len(filtered)}")
-c3.metric("Taniej w BD", str(taniej_bd), f"śr. {avg_sav_bd:.1f}%" if pd.notna(avg_sav_bd) else None)
-c4.metric("Match RW", f"{matched_rw_count} / {len(filtered)}")
-c5.metric("Taniej w RW", str(taniej_rw), f"śr. {avg_sav_rw:.1f}%" if pd.notna(avg_sav_rw) else None)
-c6.metric("", "")
-
-st.divider()
 
 # ── Tabela ────────────────────────────────────────────────────────────────────
 if len(filtered) == 0:
@@ -240,13 +222,13 @@ else:
     table_html = f"""
     <style>
         .pt {{ width:100%; border-collapse:collapse; font-size:13px; }}
-        .pt th {{ background:#f0f2f6; padding:8px 10px; text-align:left; border-bottom:2px solid #d0d3da; white-space:nowrap; }}
-        .pt td {{ padding:6px 10px; border-bottom:1px solid #eaecf0; vertical-align:middle; }}
-        .pt tr:hover td {{ background:#f7f8fa; }}
+        .pt th {{ background:rgba(128,128,128,0.15); padding:8px 10px; text-align:left; border-bottom:2px solid rgba(128,128,128,0.3); white-space:nowrap; }}
+        .pt td {{ padding:6px 10px; border-bottom:1px solid rgba(128,128,128,0.15); vertical-align:middle; }}
+        .pt tr:hover td {{ background:rgba(128,128,128,0.08); }}
         .pt a {{ color:#0068c9; text-decoration:none; }}
         .pt a:hover {{ text-decoration:underline; }}
-        .pt th.sep {{ border-left: 2px solid #c0c5d0; }}
-        .pt td.sep {{ border-left: 2px solid #eaecf0; }}
+        .pt th.sep {{ border-left: 2px solid rgba(128,128,128,0.3); }}
+        .pt td.sep {{ border-left: 1px solid rgba(128,128,128,0.15); }}
     </style>
     <table class="pt">
         <thead><tr>
