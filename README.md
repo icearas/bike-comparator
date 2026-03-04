@@ -11,6 +11,7 @@ Narzędzie do porównywania cen części rowerowych między sklepami internetowy
 | centrumrowerowe.pl | PLN | baza katalogu (CR) |
 | bike-discount.de | EUR | porównanie (BD) |
 | rowerowy.com | PLN | porównanie (RW) |
+| allegro.pl | PLN | link do wyników wyszukiwania (AL) — bez scrapingu |
 
 ---
 
@@ -196,14 +197,12 @@ Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
 
 ### Funkcje aplikacji
 
-- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach (136 produktów); BD i RW match pokazywany tam gdzie istnieje
-- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu CR, BD lub RW
-- **Filtr kategorii** — pokaż tylko wybraną kategorię części
+- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach; BD i RW match pokazywany tam gdzie istnieje
 - **Kurs EUR/PLN** — automatycznie pobierany z API NBP (kurs średni tabela A, odświeżany co 1h); można ręcznie nadpisać
 - **Filtr kategorii** — pokaż tylko wybraną kategorię części
 - **Filtr marki** — multiselect: Shimano, SRAM, RockShox, FOX
 - **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu (CR, BD lub RW)
-- **Tabela z linkami** — kolumny BD i RW obok siebie; linki do produktu we wszystkich 3 sklepach
+- **Tabela z linkami** — kolumny BD i RW obok siebie; link CR/BD/RW do konkretnego produktu + link AL do wyników wyszukiwania na Allegro (sortowanie: cena rosnąco, tylko nowe)
 
 ### Deploy na Streamlit Community Cloud (bezpłatny)
 
@@ -328,10 +327,9 @@ Apka jest publiczna (Settings → Sharing → Public w panelu Streamlit).
 
 ## 📝 TODO
 
-- [ ] Dodać czwarty sklep: bikeinn.com lub sprint-rowery.pl
-- [ ] Ujednolicić nazwy produktów między sklepami (normalizacja nazw) — CR używa pełnych polskich nazw, RW skraca (np. "Przerzutka XT RD-M8100"), BD używa angielskich; utrudnia to matching i prezentację
-- [ ] Poprawić matchowanie — więcej dopasowanych produktów (szczególnie hamulce w RW)
 - [ ] Dodać grupę Shimano GRX (gravel) i jej odpowiedniki SRAM (Rival eTap AXS / Force eTap AXS) — scraper + reguły filtrowania + matching
-- [ ] Dodać czwarty sklep: bikeinn.com lub sprint-rowery.pl
+- [ ] Poprawić matchowanie — więcej dopasowanych produktów (szczególnie hamulce w RW)
+- [ ] Dodać czwarty sklep ze scrapingiem: bikeinn.com lub sprint-rowery.pl
+- [ ] Allegro Opcja B — integracja z Allegro REST API (OAuth 2.0): pobieranie najniższej ceny nowego produktu i wyświetlanie w tabeli (aktualnie jest tylko link do wyników)
 - [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)
-- [ ] Refaktor DB — generyczny model dopasowań par sklepów (gdy pojawi się 4. sklep)
+- [ ] Refaktor DB → ujednolicony schemat PostgreSQL: `canonical_products` + `shop_listings` (schemat w `DATABASE.md`) — umożliwi kanoniczną nazwę produktu i łatwe dodawanie kolejnych sklepów
