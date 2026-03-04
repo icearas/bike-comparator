@@ -78,37 +78,12 @@ with st.sidebar:
 
     selected_label = st.selectbox("Kategoria", category_display)
 
-    min_savings_pct = st.slider(
-        "Min. oszczędność (%)",
-        min_value=0,
-        max_value=60,
-        value=0,
-        step=5,
-        help="Pokaż tylko produkty tańsze w BD o co najmniej X%.",
-    )
-
-    only_cheaper = st.checkbox(
-        "Tylko tańsze w BD",
-        value=False,
-        help="Ukryj produkty droższe lub równe w bike-discount.",
-    )
-
-    only_matched = st.checkbox(
-        "Tylko z matchem w BD",
-        value=False,
-        help="Ukryj produkty bez odpowiednika w bike-discount.",
-    )
-
-    only_cheaper_rw = st.checkbox(
-        "Tylko tańsze w RW",
-        value=False,
-        help="Pokaż tylko produkty tańsze w rowerowy.com niż w CR.",
-    )
-
-    only_matched_rw = st.checkbox(
-        "Tylko z matchem w RW",
-        value=False,
-        help="Ukryj produkty bez odpowiednika w rowerowy.com.",
+    BRANDS = ["Shimano", "SRAM", "RockShox", "FOX"]
+    selected_brands = st.multiselect(
+        "Marka",
+        options=BRANDS,
+        default=[],
+        placeholder="Wszystkie marki",
     )
 
 search_query = st.text_input(
@@ -143,20 +118,17 @@ if search_query:
     )
     filtered = filtered[mask]
 
-if only_matched:
-    filtered = filtered[filtered["bd_price_eur"].notna()]
-
-if only_matched_rw:
-    filtered = filtered[filtered["rw_price_pln"].notna()]
-
-if only_cheaper:
-    filtered = filtered[filtered["oszczednosc_pln"] > 0]
-
-if only_cheaper_rw:
-    filtered = filtered[filtered["rw_oszczednosc_pln"] > 0]
-
-if min_savings_pct > 0:
-    filtered = filtered[filtered["oszczednosc_pct"] >= min_savings_pct]
+if selected_brands:
+    brand_keywords = {
+        "Shimano":  ["shimano", "deore", "slx", "xtr", "saint"],
+        "SRAM":     ["sram", "gx eagle", "x01 eagle", "xx1 eagle", "guide", "maven", "db8"],
+        "RockShox": ["rock shox", "rockshox", "pike", "lyrik", "zeb", "yari", "psylo"],
+        "FOX":      ["fox"],
+    }
+    kws = [kw for b in selected_brands for kw in brand_keywords[b]]
+    filtered = filtered[filtered["cr_name"].str.lower().apply(
+        lambda n: any(k in n for k in kws)
+    )]
 
 # Posortuj: zmatchowane najpierw (wg oszczędności malejąco), potem niezmatchowane
 matched_rows = filtered[filtered["bd_price_eur"].notna()].sort_values("oszczednosc_pct", ascending=False)
