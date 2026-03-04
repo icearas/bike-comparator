@@ -220,6 +220,7 @@ else:
         </tr>""")
 
     table_html = f"""
+    <div style="padding: 0 1.5rem;">
     <style>
         .pt {{ width:100%; border-collapse:collapse; font-size:13px; }}
         .pt th {{ background:rgba(128,128,128,0.15); padding:8px 10px; text-align:left; border-bottom:2px solid rgba(128,128,128,0.3); white-space:nowrap; }}
@@ -243,5 +244,6 @@ else:
     <p style="font-size:12px;color:#888;margin-top:8px">
         💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło. · RW = rowerowy.com (ceny PLN).
     </p>
+    </div>
     """
     st.markdown(table_html, unsafe_allow_html=True)
