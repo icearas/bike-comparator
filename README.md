@@ -199,11 +199,10 @@ Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
 - **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach (136 produktów); BD i RW match pokazywany tam gdzie istnieje
 - **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu CR, BD lub RW
 - **Filtr kategorii** — pokaż tylko wybraną kategorię części
-- **Kurs EUR/PLN** — przelicz ceny BD na złotówki po aktualnym kursie
-- **Min. oszczędność (%)** — ukryj produkty poniżej zadanego progu (dotyczy BD)
-- **Tylko tańsze w BD / RW** — pokaż wyłącznie produkty opłacalne w danym sklepie
-- **Tylko z matchem w BD / RW** — ukryj produkty bez odpowiednika w danym sklepie
-- **Metryki** — liczba produktów CR, match BD i RW, ile taniej w BD/RW, średnia oszczędność
+- **Kurs EUR/PLN** — automatycznie pobierany z API NBP (kurs średni tabela A, odświeżany co 1h); można ręcznie nadpisać
+- **Filtr kategorii** — pokaż tylko wybraną kategorię części
+- **Filtr marki** — multiselect: Shimano, SRAM, RockShox, FOX
+- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu (CR, BD lub RW)
 - **Tabela z linkami** — kolumny BD i RW obok siebie; linki do produktu we wszystkich 3 sklepach
 
 ### Deploy na Streamlit Community Cloud (bezpłatny)
@@ -332,6 +331,7 @@ Apka jest publiczna (Settings → Sharing → Public w panelu Streamlit).
 - [ ] Dodać czwarty sklep: bikeinn.com lub sprint-rowery.pl
 - [ ] Ujednolicić nazwy produktów między sklepami (normalizacja nazw) — CR używa pełnych polskich nazw, RW skraca (np. "Przerzutka XT RD-M8100"), BD używa angielskich; utrudnia to matching i prezentację
 - [ ] Poprawić matchowanie — więcej dopasowanych produktów (szczególnie hamulce w RW)
+- [ ] Dodać grupę Shimano GRX (gravel) i jej odpowiedniki SRAM (Rival eTap AXS / Force eTap AXS) — scraper + reguły filtrowania + matching
+- [ ] Dodać czwarty sklep: bikeinn.com lub sprint-rowery.pl
 - [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)
-- [ ] Dodać pobieranie aktualnego kursu EUR/PLN z API
 - [ ] Refaktor DB — generyczny model dopasowań par sklepów (gdy pojawi się 4. sklep)

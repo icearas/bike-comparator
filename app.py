@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import urllib.request
+import json
 
 CR_ALL_PATH = Path(__file__).parent / "data" / "cr_all.csv"
 MATCHED_PATH = Path(__file__).parent / "data" / "matched_products.csv"
@@ -24,6 +26,17 @@ st.set_page_config(
 
 st.title("🚵 Bike Comparator")
 st.caption("centrumrowerowe.pl  vs  bike-discount.de  vs  rowerowy.com")
+
+
+@st.cache_data(ttl=3600)
+def fetch_eur_rate() -> float:
+    try:
+        url = "https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = json.loads(resp.read())
+        return round(data["rates"][0]["mid"], 4)
+    except Exception:
+        return 4.25
 
 
 @st.cache_data
@@ -59,14 +72,15 @@ st.markdown(
 with st.sidebar:
     st.header("⚙️ Ustawienia")
 
+    nbp_rate = fetch_eur_rate()
     eur_rate = st.number_input(
         "Kurs EUR → PLN",
         min_value=3.5,
         max_value=6.0,
-        value=4.25,
+        value=nbp_rate,
         step=0.05,
-        format="%.2f",
-        help="Użyj aktualnego kursu ze swojego banku lub Revoluta.",
+        format="%.4f",
+        help=f"Kurs NBP z dnia dzisiejszego: {nbp_rate:.4f}. Możesz go ręcznie nadpisać.",
     )
 
     st.divider()
