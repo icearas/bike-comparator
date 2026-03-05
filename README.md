@@ -248,12 +248,13 @@ Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
 
 ### Funkcje aplikacji
 
-- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach; BD i MTB match pokazywany tam gdzie istnieje
+- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach; BD, MTB i BI match pokazywany tam gdzie istnieje
 - **Kurs EUR/PLN** — automatycznie pobierany z API NBP (kurs średni tabela A, odświeżany co 1h); można ręcznie nadpisać
 - **Filtr kategorii** — pokaż tylko wybraną kategorię części
 - **Filtr marki** — multiselect: Shimano, SRAM, RockShox, FOX
-- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu (CR, BD lub MTB)
-- **Tabela z linkami** — kolumny BD i MTB obok siebie; link CR/BD/MTB do konkretnego produktu + link AL do wyników wyszukiwania na Allegro (sortowanie: cena rosnąco, tylko nowe)
+- **Filtr sklepu** — multiselect: pokaż tylko produkty dostępne w wybranym sklepie (CR, BD, MTB, BI)
+- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu (CR, BD, MTB lub BI)
+- **Tabela z cenami** — kolumny CR / BD (EUR + PLN) / MTB / BI obok siebie; link do każdego sklepu + link AL do Allegro
 
 ### Deploy na Streamlit Community Cloud (bezpłatny)
 
@@ -380,7 +381,7 @@ Apka jest publiczna (Settings → Sharing → Public w panelu Streamlit).
 
 - [ ] Dodać grupę Shimano GRX (gravel) i jej odpowiedniki SRAM (Rival eTap AXS / Force eTap AXS) — scraper + reguły filtrowania + matching
 - [ ] Poprawić matchowanie — więcej dopasowanych produktów z mtbiker.pl
-- [ ] Dodać czwarty sklep ze scrapingiem: bikeinn.com lub sprint-rowery.pl
+- [x] Dodać czwarty sklep ze scrapingiem: bikeinn.com ✅
 - [ ] Allegro Opcja B — integracja z Allegro REST API (OAuth 2.0): pobieranie najniższej ceny nowego produktu i wyświetlanie w tabeli (aktualnie jest tylko link do wyników)
 - [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)
 - [ ] Refaktor DB → ujednolicony schemat PostgreSQL: `canonical_products` + `shop_listings` (schemat w `DATABASE.md`) — umożliwi kanoniczną nazwę produktu i łatwe dodawanie kolejnych sklepów

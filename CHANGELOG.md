@@ -95,4 +95,9 @@
 - Scraper bikeinn.com bez Playwright — bezpośrednie zapytania do Elasticsearch API (`sr.tradeinn.com`)
 - 281 produktów: przerzutki, kasety, łańcuchy, hamulce, widelce (RockShox + FOX)
 - `bi_matcher.py` — matchuje CR↔BI przez AI, 46 dopasowań, wyniki w `data/bi_matched.csv`
-- Kolumna BI (PLN) i oszczędności BI w tabeli; bikeinn.com dodane do filtra sklepów
+- Kolumna BI (PLN) w tabeli; bikeinn.com dodane do filtra sklepów
+
+## 2.3 — Uproszczenie tabeli
+- Usunięcie kolumn oszczędności (PLN i %) — tabela pokazuje teraz tylko ceny ze wszystkich sklepów
+- Sortowanie zmienione na cenę CR malejąco (zmatchowane produkty pierwsze)
+- Filtr sklepu rozszerzony o centrumrowerowe.pl i bikeinn.com
