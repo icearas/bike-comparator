@@ -4,6 +4,7 @@ from models import SessionLocal, Product, init_db
 from scrapers.centrum_rowerowe import scrape_category as scrape_cr
 from scrapers.bike_discount import scrape_category as scrape_bd
 from scrapers.mtbiker import scrape_category as scrape_mtb
+from scrapers.bikeinn import scrape_category as scrape_bi
 from datetime import datetime
 
 
@@ -40,10 +41,11 @@ async def scrape_all():
     cr_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "manetki", "amortyzatory", "widelce", "dampery"]
     bd_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "widelce", "dampery"]
     mtb_categories = ["przerzutki", "hamulce", "kasety", "lancuchy", "widelce"]
+    bi_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "widelce"]
 
     total_start = time.time()
 
-    all_categories = sorted(set(cr_categories + bd_categories + mtb_categories))
+    all_categories = sorted(set(cr_categories + bd_categories + mtb_categories + bi_categories))
     for category in all_categories:
         print(f"\n=== Scrapuję kategorię: {category} ===")
         cat_start = time.time()
@@ -68,6 +70,13 @@ async def scrape_all():
                 save_products(products)
             except Exception as e:
                 print(f"Błąd MTB ({category}): {e}")
+
+        if category in bi_categories:
+            try:
+                products = await scrape_bi(category)
+                save_products(products)
+            except Exception as e:
+                print(f"Błąd BI ({category}): {e}")
 
         cat_time = time.time() - cat_start
         print(f"⏱️  {category}: {cat_time:.1f}s")

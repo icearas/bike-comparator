@@ -8,6 +8,7 @@ import json
 CR_ALL_PATH = Path(__file__).parent / "data" / "cr_all.csv"
 MATCHED_PATH = Path(__file__).parent / "data" / "matched_products.csv"
 MTB_MATCHED_PATH = Path(__file__).parent / "data" / "mtb_matched.csv"
+BI_MATCHED_PATH  = Path(__file__).parent / "data" / "bi_matched.csv"
 
 CATEGORY_LABELS = {
     "hamulce": "Hamulce",
@@ -26,7 +27,7 @@ st.set_page_config(
 )
 
 st.title("🚵 Bike Comparator")
-st.caption("centrumrowerowe.pl  vs  bike-discount.de  vs  mtbiker.pl")
+st.caption("centrumrowerowe.pl  vs  bike-discount.de  vs  mtbiker.pl  vs  bikeinn.com")
 
 
 def allegro_url(cr_name: str) -> str:
@@ -66,6 +67,14 @@ def load_data() -> pd.DataFrame:
         df["mtb_name"] = None
         df["mtb_price_pln"] = float("nan")
         df["mtb_url"] = None
+    if BI_MATCHED_PATH.exists():
+        bi = pd.read_csv(BI_MATCHED_PATH)
+        bi = bi[["cr_url", "bi_name", "bi_price_pln", "bi_url"]]
+        df = df.merge(bi, on="cr_url", how="left")
+    else:
+        df["bi_name"] = None
+        df["bi_price_pln"] = float("nan")
+        df["bi_url"] = None
     return df
 
 
@@ -113,7 +122,7 @@ with st.sidebar:
         placeholder="Wszystkie marki",
     )
 
-    SHOPS = ["centrumrowerowe.pl", "bike-discount.de", "mtbiker.pl"]
+    SHOPS = ["centrumrowerowe.pl", "bike-discount.de", "mtbiker.pl", "bikeinn.com"]
     selected_shops = st.multiselect(
         "Dostępne w sklepie",
         options=SHOPS,
@@ -144,12 +153,18 @@ filtered["mtb_oszczednosc_pct"] = (
     filtered["mtb_oszczednosc_pln"] / filtered["cr_price_pln"] * 100
 ).round(1)
 
+filtered["bi_oszczednosc_pln"] = (filtered["cr_price_pln"] - filtered["bi_price_pln"]).round(2)
+filtered["bi_oszczednosc_pct"] = (
+    filtered["bi_oszczednosc_pln"] / filtered["cr_price_pln"] * 100
+).round(1)
+
 if search_query:
     q = search_query.strip().lower()
     mask = (
         filtered["cr_name"].str.lower().str.contains(q, na=False)
         | filtered["bd_name"].str.lower().str.contains(q, na=False)
         | filtered["mtb_name"].str.lower().str.contains(q, na=False)
+        | filtered["bi_name"].str.lower().str.contains(q, na=False)
     )
     filtered = filtered[mask]
 
@@ -161,6 +176,8 @@ if selected_shops:
         shop_mask |= filtered["bd_price_eur"].notna()
     if "mtbiker.pl" in selected_shops:
         shop_mask |= filtered["mtb_price_pln"].notna()
+    if "bikeinn.com" in selected_shops:
+        shop_mask |= filtered["bi_price_pln"].notna()
     filtered = filtered[shop_mask]
 
 if selected_brands:
@@ -189,6 +206,7 @@ else:
     for _, row in filtered.iterrows():
         has_bd = pd.notna(row.get("bd_price_eur"))
         has_mtb = pd.notna(row.get("mtb_price_pln"))
+        has_bi = pd.notna(row.get("bi_price_pln"))
         cr_link = f'<a href="{row["cr_url"]}" rel="noreferrer noopener" target="_blank">CR 🔗</a>' if row.get("cr_url") else "—"
         al_link = f'<a href="{allegro_url(row["cr_name"])}" rel="noreferrer noopener" target="_blank">AL 🔗</a>'
 
@@ -220,6 +238,19 @@ else:
             sav_mtb_pct = '<td style="text-align:right;color:#aaa">—</td>'
             mtb_link = '<span style="color:#aaa">—</span>'
 
+        if has_bi:
+            color_bi = "#1a7f37" if row["bi_oszczednosc_pln"] > 0 else "#c0392b"
+            sign_bi = "+" if row["bi_oszczednosc_pln"] > 0 else ""
+            bi_pln = f"{row['bi_price_pln']:.2f} zł"
+            sav_bi_pln = f'<td style="text-align:right;color:{color_bi};font-weight:bold">{sign_bi}{row["bi_oszczednosc_pln"]:.2f} zł</td>'
+            sav_bi_pct = f'<td style="text-align:right;color:{color_bi};font-weight:bold">{sign_bi}{row["bi_oszczednosc_pct"]:.1f}%</td>'
+            bi_link = f'<a href="{row["bi_url"]}" rel="noreferrer noopener" target="_blank">BI 🔗</a>'
+        else:
+            bi_pln = "—"
+            sav_bi_pln = '<td style="text-align:right;color:#aaa">—</td>'
+            sav_bi_pct = '<td style="text-align:right;color:#aaa">—</td>'
+            bi_link = '<span style="color:#aaa">—</span>'
+
         rows_html.append(f"""
         <tr>
             <td>{CATEGORY_LABELS.get(row['category'], row['category'])}</td>
@@ -232,9 +263,13 @@ else:
             <td style="text-align:right">{mtb_pln}</td>
             {sav_mtb_pln}
             {sav_mtb_pct}
+            <td class="sep" style="text-align:right">{bi_pln}</td>
+            {sav_bi_pln}
+            {sav_bi_pct}
             <td style="text-align:center">{cr_link}</td>
             <td style="text-align:center">{bd_link}</td>
             <td style="text-align:center">{mtb_link}</td>
+            <td style="text-align:center">{bi_link}</td>
             <td style="text-align:center">{al_link}</td>
         </tr>""")
 
@@ -256,12 +291,13 @@ else:
             <th>CR (PLN)</th>
             <th class="sep">BD (EUR)</th><th>BD (~PLN @ {eur_rate:.2f})</th><th>Oszcz. BD (PLN)</th><th>Oszcz. BD (%)</th>
             <th class="sep">MTB (PLN)</th><th>Oszcz. MTB (PLN)</th><th>Oszcz. MTB (%)</th>
-            <th class="sep">Link CR</th><th>Link BD</th><th>Link MTB</th><th>Link AL</th>
+            <th class="sep">BI (PLN)</th><th>Oszcz. BI (PLN)</th><th>Oszcz. BI (%)</th>
+            <th class="sep">Link CR</th><th>Link BD</th><th>Link MTB</th><th>Link BI</th><th>Link AL</th>
         </tr></thead>
         <tbody>{''.join(rows_html)}</tbody>
     </table>
     <p style="font-size:12px;color:#888;margin-top:8px">
-        💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło. · MTB = mtbiker.pl (ceny PLN). · made by <a href="https://buycoffee.to/icearas" rel="noreferrer noopener" target="_blank" style="color:#888">icearas</a>
+        💡 Kurs EUR/PLN: {eur_rate:.2f} · Ceny BD w PLN są orientacyjne — uwzględnij koszty dostawy i ewentualne cło. · MTB = mtbiker.pl · BI = bikeinn.com (ceny PLN). · made by <a href="https://buycoffee.to/icearas" rel="noreferrer noopener" target="_blank" style="color:#888">icearas</a>
     </p>
     </div>
     """
