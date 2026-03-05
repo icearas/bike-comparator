@@ -79,9 +79,10 @@ def load_data() -> pd.DataFrame:
 
 
 df = load_data()
-last_updated = df["matched_at"].max()
-if pd.notna(last_updated):
-    st.caption(f"Ostatnia aktualizacja danych: {last_updated.strftime('%d.%m.%Y')}")
+import os, datetime
+_mtime = os.path.getmtime(CR_ALL_PATH)
+last_updated = datetime.datetime.fromtimestamp(_mtime).strftime("%d.%m.%Y")
+st.caption(f"Ostatnia aktualizacja danych: {last_updated}")
 
 st.markdown(
     """<a href="https://buycoffee.to/icearas" rel="noreferrer noopener" target="_blank">
