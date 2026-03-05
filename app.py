@@ -113,7 +113,7 @@ with st.sidebar:
         placeholder="Wszystkie marki",
     )
 
-    SHOPS = ["bike-discount.de", "mtbiker.pl"]
+    SHOPS = ["centrumrowerowe.pl", "bike-discount.de", "mtbiker.pl"]
     selected_shops = st.multiselect(
         "Dostępne w sklepie",
         options=SHOPS,
@@ -155,6 +155,8 @@ if search_query:
 
 if selected_shops:
     shop_mask = pd.Series(False, index=filtered.index)
+    if "centrumrowerowe.pl" in selected_shops:
+        shop_mask |= pd.Series(True, index=filtered.index)
     if "bike-discount.de" in selected_shops:
         shop_mask |= filtered["bd_price_eur"].notna()
     if "mtbiker.pl" in selected_shops:
