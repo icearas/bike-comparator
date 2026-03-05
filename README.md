@@ -10,7 +10,7 @@ Narzędzie do porównywania cen części rowerowych między sklepami internetowy
 |-------|--------|------|
 | centrumrowerowe.pl | PLN | baza katalogu (CR) |
 | bike-discount.de | EUR | porównanie (BD) |
-| rowerowy.com | PLN | porównanie (RW) |
+| mtbiker.pl | PLN | porównanie (MTB) |
 | allegro.pl | PLN | link do wyników wyszukiwania (AL) — bez scrapingu |
 
 ---
@@ -44,18 +44,18 @@ bike-comparator/
 ├── data/
 │   ├── cr_all.csv             # Pełny katalog CR po filtrach (generowany przez export_cr.py)
 │   ├── matched_products.csv   # Dopasowania CR↔BD (generowane przez ai_matcher.py)
-│   └── rw_matched.csv         # Dopasowania CR↔RW (generowane przez rw_matcher.py)
+│   └── mtb_matched.csv        # Dopasowania CR↔MTB (generowane przez mtb_matcher.py)
 └── backend/
     ├── models.py               # Modele SQLAlchemy (SQLite)
-    ├── main.py                 # Orkiestracja scrapingu (CR + BD + RW)
+    ├── main.py                 # Orkiestracja scrapingu (CR + BD + MTB)
     ├── seed_rules.py           # Wypełnienie reguł filtrowania
     ├── ai_matcher.py           # Dopasowywanie CR↔BD przez AI → DB
-    ├── rw_matcher.py           # Dopasowywanie CR↔RW przez AI → data/rw_matched.csv
+    ├── mtb_matcher.py          # Dopasowywanie CR↔MTB przez AI → data/mtb_matched.csv
     ├── export_cr.py            # Eksport filtrowanych produktów CR z DB → data/cr_all.csv
     └── scrapers/
         ├── centrum_rowerowe.py # Scraper centrumrowerowe.pl
         ├── bike_discount.py    # Scraper bike-discount.de
-        └── rowerowy.py         # Scraper rowerowy.com (infinite scroll, Playwright)
+        └── mtbiker.py          # Scraper mtbiker.pl (paginacja URL, Playwright)
 ```
 
 ---
@@ -119,8 +119,8 @@ python main.py
 # Dopasuj CR↔BD (zapisuje do DB)
 python ai_matcher.py
 
-# Dopasuj CR↔RW (zapisuje do data/rw_matched.csv)
-python rw_matcher.py
+# Dopasuj CR↔MTB (zapisuje do data/mtb_matched.csv)
+python mtb_matcher.py
 
 # Eksportuj katalog CR do CSV
 python export_cr.py
@@ -141,8 +141,8 @@ python main.py
 python3 -c "from models import SessionLocal, MatchedProduct; db = SessionLocal(); db.query(MatchedProduct).delete(); db.commit(); db.close()"
 python ai_matcher.py
 
-# Dopasuj ponownie CR↔RW (nadpisuje rw_matched.csv)
-python rw_matcher.py
+# Dopasuj ponownie CR↔MTB (nadpisuje mtb_matched.csv)
+python mtb_matcher.py
 
 # Eksportuj katalog CR do CSV
 python export_cr.py
@@ -197,12 +197,12 @@ Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
 
 ### Funkcje aplikacji
 
-- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach; BD i RW match pokazywany tam gdzie istnieje
+- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach; BD i MTB match pokazywany tam gdzie istnieje
 - **Kurs EUR/PLN** — automatycznie pobierany z API NBP (kurs średni tabela A, odświeżany co 1h); można ręcznie nadpisać
 - **Filtr kategorii** — pokaż tylko wybraną kategorię części
 - **Filtr marki** — multiselect: Shimano, SRAM, RockShox, FOX
-- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu (CR, BD lub RW)
-- **Tabela z linkami** — kolumny BD i RW obok siebie; link CR/BD/RW do konkretnego produktu + link AL do wyników wyszukiwania na Allegro (sortowanie: cena rosnąco, tylko nowe)
+- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu (CR, BD lub MTB)
+- **Tabela z linkami** — kolumny BD i MTB obok siebie; link CR/BD/MTB do konkretnego produktu + link AL do wyników wyszukiwania na Allegro (sortowanie: cena rosnąco, tylko nowe)
 
 ### Deploy na Streamlit Community Cloud (bezpłatny)
 
@@ -211,21 +211,21 @@ Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
 3. Kliknij **New app** → wskaż repo → ustaw **Main file path**: `app.py`
 4. Kliknij **Deploy**
 
-> Po każdym odświeżeniu cen: uruchom `python export_cr.py`, `python rw_matcher.py` i wyeksportuj `matched_products.csv`, zacommituj wszystkie trzy pliki CSV i pushuj — Streamlit Cloud automatycznie pobierze nowe dane.
+> Po każdym odświeżeniu cen: uruchom `python export_cr.py`, `python mtb_matcher.py` i wyeksportuj `matched_products.csv`, zacommituj wszystkie trzy pliki CSV i pushuj — Streamlit Cloud automatycznie pobierze nowe dane.
 
 ---
 
 ## 🤖 Jak działa dopasowywanie AI
 
-Dwa niezależne matchery: `ai_matcher.py` (CR↔BD, wyniki w DB) i `rw_matcher.py` (CR↔RW, wyniki w `data/rw_matched.csv`). Oba działają identycznie:
+Dwa niezależne matchery: `ai_matcher.py` (CR↔BD, wyniki w DB) i `mtb_matcher.py` (CR↔MTB, wyniki w `data/mtb_matched.csv`). Oba działają identycznie:
 
 1. Produkty są filtrowane przez reguły z tabeli `filter_rules` (tylko wybrane marki i grupy)
 2. Części serwisowe, narzędzia i akcesoria (klocki, linki, rebuild kity, narzędzia, tokeny, płyny itp.) są odrzucane przez rozszerzoną listę `SKIP_KEYWORDS`
-3. Dla każdego produktu z CR szukamy kandydatów z BD/RW tej samej marki i kategorii
+3. Dla każdego produktu z CR szukamy kandydatów z BD/MTB tej samej marki i kategorii
 4. Pre-filter po **grade zawieszenia** — FOX (Factory/Performance Elite/E-Optimized/Performance/Rhythm) i RockShox (Ultimate/Select+/Select/R) — zapobiega krzyżowaniu grade'ów; FOX bez grade'u (`fox_ungraded`) nie jest matchowany
 5. Pre-filter po numerach modelu (np. `RD-M8100`, `BL-M9220`) zawęża kandydatów do max 3 przed wywołaniem AI
 6. Claude Haiku ocenia czy dwa produkty to ten sam produkt (zwraca JSON z `same` i `confidence`); wersje dampera (Charger 3 vs Charger 3.1) traktowane jako różne produkty
-7. Dopasowania z confidence ≥ 95% są zapisywane (CR↔BD → DB, CR↔RW → CSV)
+7. Dopasowania z confidence ≥ 95% są zapisywane (CR↔BD → DB, CR↔MTB → CSV)
 
 **Parametry matchera** (`ai_matcher.py`):
 
@@ -328,7 +328,7 @@ Apka jest publiczna (Settings → Sharing → Public w panelu Streamlit).
 ## 📝 TODO
 
 - [ ] Dodać grupę Shimano GRX (gravel) i jej odpowiedniki SRAM (Rival eTap AXS / Force eTap AXS) — scraper + reguły filtrowania + matching
-- [ ] Poprawić matchowanie — więcej dopasowanych produktów (szczególnie hamulce w RW)
+- [ ] Poprawić matchowanie — więcej dopasowanych produktów z mtbiker.pl
 - [ ] Dodać czwarty sklep ze scrapingiem: bikeinn.com lub sprint-rowery.pl
 - [ ] Allegro Opcja B — integracja z Allegro REST API (OAuth 2.0): pobieranie najniższej ceny nowego produktu i wyświetlanie w tabeli (aktualnie jest tylko link do wyników)
 - [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)

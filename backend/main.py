@@ -3,7 +3,7 @@ import time
 from models import SessionLocal, Product, init_db
 from scrapers.centrum_rowerowe import scrape_category as scrape_cr
 from scrapers.bike_discount import scrape_category as scrape_bd
-from scrapers.rowerowy import scrape_category as scrape_rw
+from scrapers.mtbiker import scrape_category as scrape_mtb
 from datetime import datetime
 
 
@@ -39,11 +39,11 @@ def save_products(products: list[dict]):
 async def scrape_all():
     cr_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "manetki", "amortyzatory", "widelce", "dampery"]
     bd_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "widelce", "dampery"]
-    rw_categories  = ["przerzutki", "hamulce", "kasety", "lancuchy", "amortyzatory", "dampery"]
+    mtb_categories = ["przerzutki", "hamulce", "kasety", "lancuchy", "widelce"]
 
     total_start = time.time()
 
-    all_categories = sorted(set(cr_categories + bd_categories + rw_categories))
+    all_categories = sorted(set(cr_categories + bd_categories + mtb_categories))
     for category in all_categories:
         print(f"\n=== Scrapuję kategorię: {category} ===")
         cat_start = time.time()
@@ -62,12 +62,12 @@ async def scrape_all():
             except Exception as e:
                 print(f"Błąd BD ({category}): {e}")
 
-        if category in rw_categories:
+        if category in mtb_categories:
             try:
-                products = await scrape_rw(category)
+                products = await scrape_mtb(category)
                 save_products(products)
             except Exception as e:
-                print(f"Błąd RW ({category}): {e}")
+                print(f"Błąd MTB ({category}): {e}")
 
         cat_time = time.time() - cat_start
         print(f"⏱️  {category}: {cat_time:.1f}s")
