@@ -64,7 +64,7 @@ def load_data() -> pd.DataFrame:
         df = df.merge(mtb, on="cr_url", how="left")
     else:
         df["mtb_name"] = None
-        df["mtb_price_pln"] = None
+        df["mtb_price_pln"] = float("nan")
         df["mtb_url"] = None
     return df
 
