@@ -153,11 +153,25 @@ async def run():
 asyncio.run(run())
 "
 
+# Tylko bikeinn.com (BI)
+python -c "
+import asyncio
+from main import save_products
+from scrapers.bikeinn import scrape_category, CATEGORIES
+async def run():
+    for cat in CATEGORIES:
+        save_products(await scrape_category(cat))
+asyncio.run(run())
+"
+
 # Dopasuj CR↔BD (zapisuje do DB)
 python ai_matcher.py
 
 # Dopasuj CR↔MTB (zapisuje do data/mtb_matched.csv)
 python mtb_matcher.py
+
+# Dopasuj CR↔BI (zapisuje do data/bi_matched.csv)
+python bi_matcher.py
 
 # Eksportuj katalog CR do CSV
 python export_cr.py

@@ -88,5 +88,11 @@
 - Kolumna MTB (PLN) i oszczędności MTB widoczne na produkcji
 
 ## 2.1 — Filtr dostępności w sklepie
-- Multiselect „Dostępne w sklepie" w sidebarze (bike-discount.de, mtbiker.pl)
+- Multiselect „Dostępne w sklepie" w sidebarze (centrumrowerowe.pl, bike-discount.de, mtbiker.pl)
 - Filtruje wiersze mające dopasowaną cenę w wybranym sklepie (OR między sklepami)
+
+## 2.2 — Czwarty sklep: bikeinn.com
+- Scraper bikeinn.com bez Playwright — bezpośrednie zapytania do Elasticsearch API (`sr.tradeinn.com`)
+- 281 produktów: przerzutki, kasety, łańcuchy, hamulce, widelce (RockShox + FOX)
+- `bi_matcher.py` — matchuje CR↔BI przez AI, 46 dopasowań, wyniki w `data/bi_matched.csv`
+- Kolumna BI (PLN) i oszczędności BI w tabeli; bikeinn.com dodane do filtra sklepów
