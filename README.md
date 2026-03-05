@@ -116,6 +116,43 @@ python seed_rules.py
 # Uruchom scraping wszystkich 3 sklepów (kilka–kilkanaście minut)
 python main.py
 
+# --- LUB scraping wybranego sklepu z osobna ---
+
+# Tylko centrumrowerowe.pl (CR)
+python -c "
+import asyncio
+from main import save_products
+from scrapers.centrum_rowerowe import scrape_category
+CATEGORIES = ['przerzutki', 'hamulce', 'kasety', 'lancuchy', 'manetki', 'amortyzatory', 'widelce', 'dampery']
+async def run():
+    for cat in CATEGORIES:
+        save_products(await scrape_category(cat, max_pages=15))
+asyncio.run(run())
+"
+
+# Tylko bike-discount.de (BD)
+python -c "
+import asyncio
+from main import save_products
+from scrapers.bike_discount import scrape_category
+CATEGORIES = ['przerzutki', 'hamulce', 'kasety', 'lancuchy', 'widelce', 'dampery']
+async def run():
+    for cat in CATEGORIES:
+        save_products(await scrape_category(cat, max_pages=10))
+asyncio.run(run())
+"
+
+# Tylko mtbiker.pl (MTB)
+python -c "
+import asyncio
+from main import save_products
+from scrapers.mtbiker import scrape_category, CATEGORIES
+async def run():
+    for cat in CATEGORIES:
+        save_products(await scrape_category(cat))
+asyncio.run(run())
+"
+
 # Dopasuj CR↔BD (zapisuje do DB)
 python ai_matcher.py
 

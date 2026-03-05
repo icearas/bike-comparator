@@ -1,6 +1,11 @@
 """
 Scraper mtbiker.pl — Playwright + paginacja URL
 Uruchamiaj z katalogu backend/: python scrapers/mtbiker.py
+
+Struktura HTML:
+  div.product-item          — kontener kafelka
+  p.product-name > a.link-dark — nazwa + href
+  strong.shop-list-price    — cena (np. "44,99 zł" lub "od 44,99 zł")
 """
 
 import asyncio
@@ -19,12 +24,13 @@ CATEGORIES = {
     "widelce":    "/shop/komponenty/widelce-i-amortyzatory",
 }
 
-BRANDS_PARAM = {
-    "hamulce":    "shimano,sram",
-    "kasety":     "shimano,sram",
-    "lancuchy":   "shimano,sram",
-    "przerzutki": "shimano,sram",
-    "widelce":    "rockshox,fox",
+# Filtrowanie po marce w kodzie (brand filter URL nie działa)
+BRAND_KEYWORDS = {
+    "hamulce":    ["shimano", "sram", "deore", "slx", "xt", "xtr", "saint", "guide", "maven", "db8"],
+    "kasety":     ["shimano", "sram", "deore", "slx", "xt", "xtr"],
+    "lancuchy":   ["shimano", "sram", "deore", "slx", "xt", "xtr"],
+    "przerzutki": ["shimano", "sram", "deore", "slx", "xt", "xtr", "saint"],
+    "widelce":    ["rockshox", "rock shox", "fox", "pike", "lyrik", "zeb", "yari", "psylo"],
 }
 
 ALLOWED_GROUPS = {
@@ -62,13 +68,13 @@ SUSPENSION_SKIP = [
 ]
 
 DRIVETRAIN_SKIP = [
-    "kółka", "kółko", "kólka", "kółko", "jockey",
+    "kółka", "kółko", "jockey",
     "wózek", "cage",
     "spare", "części zamienne", "serwisowy",
     "pulley", "puly", "ślizg",
     "linka", "pancerz",
     "spinka", "quick link", "missing link",
-    "szosowy", "szosowa", "gravel",
+    "szosowy", "szosowa",
     "bleed", "mineral", "płyn",
     " + ",
 ]
@@ -89,14 +95,18 @@ SUSPENSION_KEYWORDS = [
 
 
 def parse_price(text: str) -> float | None:
-    text = text.strip()
-    text = re.sub(r'^[Oo]d\s+', '', text)
+    text = re.sub(r'^[Oo]d\s+', '', text.strip())
     text = text.replace("\xa0", " ").replace("zł", "").replace("PLN", "").strip()
     text = text.replace(" ", "").replace(",", ".")
     try:
         return float(text)
     except ValueError:
         return None
+
+
+def is_correct_brand(name: str, category: str) -> bool:
+    name_lower = name.lower()
+    return any(kw in name_lower for kw in BRAND_KEYWORDS.get(category, []))
 
 
 def is_current_shimano(name: str) -> bool:
@@ -128,12 +138,14 @@ def is_valid_suspension(name: str) -> bool:
 
 def is_fork(name: str) -> bool:
     name_lower = name.lower()
-    return any(kw in name_lower for kw in ["widelec", "fork", "pike", "lyrik", "zeb", "yari", "psylo", "fox 36", "fox 38", "fox 40"])
+    return any(kw in name_lower for kw in [
+        "widelec", "fork", "pike", "lyrik", "zeb", "yari", "psylo", "fox 36", "fox 38", "fox 40"
+    ])
 
 
-def build_url(category_path: str, brands: str, page: int) -> str:
+def build_url(category_path: str, page: int) -> str:
     page_segment = f"/page-{page}" if page > 1 else ""
-    return f"{BASE_URL}{category_path}{page_segment}/?brands={brands}"
+    return f"{BASE_URL}{category_path}{page_segment}/"
 
 
 async def scrape_category(category: str, max_pages: int = 8) -> list[dict]:
@@ -141,7 +153,6 @@ async def scrape_category(category: str, max_pages: int = 8) -> list[dict]:
     if not path:
         raise ValueError(f"Nieznana kategoria: {category}")
 
-    brands = BRANDS_PARAM.get(category, "shimano,sram")
     products = []
     seen_urls: set[str] = set()
 
@@ -152,7 +163,7 @@ async def scrape_category(category: str, max_pages: int = 8) -> list[dict]:
         )
 
         for page_num in range(1, max_pages + 1):
-            url = build_url(path, brands, page_num)
+            url = build_url(path, page_num)
             print(f"  Strona {page_num}: {url}")
 
             try:
@@ -165,18 +176,22 @@ async def scrape_category(category: str, max_pages: int = 8) -> list[dict]:
             html = await page_obj.content()
             soup = BeautifulSoup(html, "html.parser")
 
-            # Szukaj linków do produktów (-p{id}.html)
-            product_links = soup.select('a[href*="-p"]')
-            product_links = [a for a in product_links if re.search(r'-p\d+\.html', a.get("href", ""))]
-
-            if not product_links:
+            items = soup.select("div.product-item")
+            if not items:
                 print(f"  Brak produktów na stronie {page_num} — koniec paginacji")
                 break
 
             page_products = 0
-            for a in product_links:
+            for item in items:
                 try:
-                    href = a.get("href", "")
+                    # Nazwa i URL z a.link-dark wewnątrz p.product-name
+                    name_tag = item.select_one("p.product-name a.link-dark")
+                    if not name_tag:
+                        continue
+                    name = name_tag.get_text(strip=True)
+                    href = name_tag.get("href", "")
+                    if not href:
+                        continue
                     if not href.startswith("http"):
                         href = BASE_URL + href
                     href = href.split("?")[0]
@@ -185,38 +200,27 @@ async def scrape_category(category: str, max_pages: int = 8) -> list[dict]:
                         continue
                     seen_urls.add(href)
 
-                    # Nazwa: szukaj span.product-name lub atrybut title lub tekst anchora
-                    name_el = a.select_one("span.product-name, .product-name, [class*='name']")
-                    if name_el:
-                        name = name_el.get_text(strip=True)
-                    else:
-                        name = a.get("title", "").strip() or a.get_text(strip=True)[:100]
-
                     if not name or len(name) < 5:
                         continue
 
-                    # Cena: szukaj span.price lub pierwszy element z "zł"
-                    price_el = a.select_one("span.price, .price, [class*='price']")
-                    if not price_el:
-                        # fallback: szukaj tekstu z "zł"
-                        text = a.get_text()
-                        m = re.search(r'(\d[\d\s,]+)\s*zł', text)
-                        price = float(m.group(1).replace(" ", "").replace(",", ".")) if m else None
-                    else:
-                        price = parse_price(price_el.get_text())
+                    # Filtracja po marce
+                    if not is_correct_brand(name, category):
+                        continue
 
+                    # Cena z strong.shop-list-price
+                    price_el = item.select_one("strong.shop-list-price")
+                    if not price_el:
+                        continue
+                    price = parse_price(price_el.get_text())
                     if price is None or price <= 0:
                         continue
 
-                    # Filtracja
+                    # Filtracja po kategorii
                     actual_category = category
                     if category == "widelce":
-                        if is_fork(name):
-                            actual_category = "widelce"
-                        else:
-                            actual_category = "dampery"
                         if not is_valid_suspension(name):
                             continue
+                        actual_category = "widelce" if is_fork(name) else "dampery"
                     else:
                         if not is_valid_drivetrain(name, category):
                             continue
@@ -232,10 +236,10 @@ async def scrape_category(category: str, max_pages: int = 8) -> list[dict]:
                     page_products += 1
 
                 except Exception as e:
-                    print(f"  Błąd parsowania produktu: {e}")
+                    print(f"  Błąd parsowania: {e}")
                     continue
 
-            print(f"  Strona {page_num}: {page_products} produktów po filtrach")
+            print(f"  Strona {page_num}: {page_products} produktów po filtrach ({len(items)} kafelków)")
 
         await browser.close()
 
