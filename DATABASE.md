@@ -84,8 +84,8 @@ Jeden wiersz na sklep. Dodanie nowego sklepu nie wymaga zmian schematu.
 ```sql
 CREATE TABLE shops (
     id       SERIAL PRIMARY KEY,
-    name     TEXT NOT NULL UNIQUE,   -- "centrumrowerowe.pl", "bike-discount.de", "rowerowy.com"
-    slug     TEXT NOT NULL UNIQUE,   -- "cr", "bd", "rw"
+    name     TEXT NOT NULL UNIQUE,   -- "centrumrowerowe.pl", "bike-discount.de", "mtbiker.pl", "bikeinn.com"
+    slug     TEXT NOT NULL UNIQUE,   -- "cr", "bd", "mtb", "bi"
     currency CHAR(3) NOT NULL,       -- "PLN", "EUR"
     country  CHAR(2) NOT NULL        -- "PL", "DE"
 );
@@ -202,23 +202,30 @@ SELECT
     bd_sl.url              AS bd_url,
     bd_sl.raw_name         AS bd_raw_name,
 
-    -- Rowerowy.com (PLN)
-    rw_sl.price            AS rw_price_pln,
-    rw_sl.url              AS rw_url,
-    rw_sl.raw_name         AS rw_raw_name,
+    -- mtbiker.pl (PLN)
+    mtb_sl.price           AS mtb_price_pln,
+    mtb_sl.url             AS mtb_url,
+    mtb_sl.raw_name        AS mtb_raw_name,
 
-    GREATEST(cr_sl.scraped_at, bd_sl.scraped_at, rw_sl.scraped_at) AS last_updated
+    -- bikeinn.com (PLN)
+    bi_sl.price            AS bi_price_pln,
+    bi_sl.url              AS bi_url,
+    bi_sl.raw_name         AS bi_raw_name,
+
+    GREATEST(cr_sl.scraped_at, bd_sl.scraped_at, mtb_sl.scraped_at, bi_sl.scraped_at) AS last_updated
 
 FROM canonical_products cp
 JOIN brands     b   ON b.id   = cp.brand_id
 JOIN categories cat ON cat.id = cp.category_id
 
-LEFT JOIN shop_listings cr_sl ON cr_sl.canonical_product_id = cp.id
-    AND cr_sl.shop_id = (SELECT id FROM shops WHERE slug = 'cr')
-LEFT JOIN shop_listings bd_sl ON bd_sl.canonical_product_id = cp.id
-    AND bd_sl.shop_id = (SELECT id FROM shops WHERE slug = 'bd')
-LEFT JOIN shop_listings rw_sl ON rw_sl.canonical_product_id = cp.id
-    AND rw_sl.shop_id = (SELECT id FROM shops WHERE slug = 'rw');
+LEFT JOIN shop_listings cr_sl  ON cr_sl.canonical_product_id  = cp.id
+    AND cr_sl.shop_id  = (SELECT id FROM shops WHERE slug = 'cr')
+LEFT JOIN shop_listings bd_sl  ON bd_sl.canonical_product_id  = cp.id
+    AND bd_sl.shop_id  = (SELECT id FROM shops WHERE slug = 'bd')
+LEFT JOIN shop_listings mtb_sl ON mtb_sl.canonical_product_id = cp.id
+    AND mtb_sl.shop_id = (SELECT id FROM shops WHERE slug = 'mtb')
+LEFT JOIN shop_listings bi_sl  ON bi_sl.canonical_product_id  = cp.id
+    AND bi_sl.shop_id  = (SELECT id FROM shops WHERE slug = 'bi');
 ```
 
 ---
@@ -233,11 +240,13 @@ SELECT
     category,
     cr_price_pln,
     ROUND(bd_price_eur * 4.23, 2) AS bd_price_pln,
-    rw_price_pln,
+    mtb_price_pln,
+    bi_price_pln,
     LEAST(
         cr_price_pln,
         ROUND(bd_price_eur * 4.23, 2),
-        rw_price_pln
+        mtb_price_pln,
+        bi_price_pln
     ) AS min_price
 FROM v_price_comparison
 WHERE cr_price_pln IS NOT NULL
@@ -311,12 +320,15 @@ DO UPDATE SET
 
 | Obecna tabela | Docelowe miejsce |
 |---------------|-----------------|
-| `products` (shop=cr) | `shop_listings` + `canonical_products` |
-| `products` (shop=bd) | `shop_listings` |
-| `products` (shop=rw) | `shop_listings` |
+| `products` (shop=centrumrowerowe.pl) | `shop_listings` + `canonical_products` |
+| `products` (shop=bike-discount.de) | `shop_listings` |
+| `products` (shop=mtbiker.pl) | `shop_listings` |
+| `products` (shop=bikeinn.com) | `shop_listings` |
 | `matched_products` | połączone w `canonical_product_id` w `shop_listings` |
 | `filter_rules` | bez zmiany lub jako kolumna `tracked BOOLEAN` w `canonical_products` |
-| `data/rw_matched.csv` | wchłonięte przez `shop_listings` |
+| `data/matched_products.csv` | wchłonięte przez `shop_listings` |
+| `data/mtb_matched.csv` | wchłonięte przez `shop_listings` |
+| `data/bi_matched.csv` | wchłonięte przez `shop_listings` |
 
 ---
 
