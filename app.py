@@ -192,9 +192,10 @@ if selected_brands:
         lambda n: any(k in n for k in kws)
     )]
 
-# Posortuj: zmatchowane najpierw (wg oszczędności malejąco), potem niezmatchowane
-matched_rows = filtered[filtered["bd_price_eur"].notna()].sort_values("oszczednosc_pct", ascending=False)
-unmatched_rows = filtered[filtered["bd_price_eur"].isna()].sort_values("cr_price_pln", ascending=False)
+# Posortuj: zmatchowane (mające jakikolwiek match) najpierw, potem niezmatchowane — wg ceny CR malejąco
+has_any_match = filtered["bd_price_eur"].notna() | filtered["mtb_price_pln"].notna() | filtered["bi_price_pln"].notna()
+matched_rows = filtered[has_any_match].sort_values("cr_price_pln", ascending=False)
+unmatched_rows = filtered[~has_any_match].sort_values("cr_price_pln", ascending=False)
 filtered = pd.concat([matched_rows, unmatched_rows])
 
 
@@ -210,63 +211,26 @@ else:
         cr_link = f'<a href="{row["cr_url"]}" rel="noreferrer noopener" target="_blank">CR 🔗</a>' if row.get("cr_url") else "—"
         al_link = f'<a href="{allegro_url(row["cr_name"])}" rel="noreferrer noopener" target="_blank">AL 🔗</a>'
 
-        if has_bd:
-            color_bd = "#1a7f37" if row["oszczednosc_pln"] > 0 else "#c0392b"
-            sign_bd = "+" if row["oszczednosc_pln"] > 0 else ""
-            bd_eur = f"{row['bd_price_eur']:.2f} €"
-            bd_pln = f"{row['bd_price_pln']:.2f} zł"
-            sav_bd_pln = f'<td style="text-align:right;color:{color_bd};font-weight:bold">{sign_bd}{row["oszczednosc_pln"]:.2f} zł</td>'
-            sav_bd_pct = f'<td style="text-align:right;color:{color_bd};font-weight:bold">{sign_bd}{row["oszczednosc_pct"]:.1f}%</td>'
-            bd_link = f'<a href="{row["bd_url"]}" rel="noreferrer noopener" target="_blank">BD 🔗</a>'
-        else:
-            bd_eur = "—"
-            bd_pln = "—"
-            sav_bd_pln = '<td style="text-align:right;color:#aaa">—</td>'
-            sav_bd_pct = '<td style="text-align:right;color:#aaa">—</td>'
-            bd_link = '<span style="color:#aaa">—</span>'
+        bd_eur = f"{row['bd_price_eur']:.2f} €" if has_bd else "—"
+        bd_pln = f"{row['bd_price_pln']:.2f} zł" if has_bd else "—"
+        bd_link = f'<a href="{row["bd_url"]}" rel="noreferrer noopener" target="_blank">BD 🔗</a>' if has_bd else '<span style="color:#aaa">—</span>'
 
-        if has_mtb:
-            color_mtb = "#1a7f37" if row["mtb_oszczednosc_pln"] > 0 else "#c0392b"
-            sign_mtb = "+" if row["mtb_oszczednosc_pln"] > 0 else ""
-            mtb_pln = f"{row['mtb_price_pln']:.2f} zł"
-            sav_mtb_pln = f'<td style="text-align:right;color:{color_mtb};font-weight:bold">{sign_mtb}{row["mtb_oszczednosc_pln"]:.2f} zł</td>'
-            sav_mtb_pct = f'<td style="text-align:right;color:{color_mtb};font-weight:bold">{sign_mtb}{row["mtb_oszczednosc_pct"]:.1f}%</td>'
-            mtb_link = f'<a href="{row["mtb_url"]}" rel="noreferrer noopener" target="_blank">MTB 🔗</a>'
-        else:
-            mtb_pln = "—"
-            sav_mtb_pln = '<td style="text-align:right;color:#aaa">—</td>'
-            sav_mtb_pct = '<td style="text-align:right;color:#aaa">—</td>'
-            mtb_link = '<span style="color:#aaa">—</span>'
+        mtb_pln = f"{row['mtb_price_pln']:.2f} zł" if has_mtb else "—"
+        mtb_link = f'<a href="{row["mtb_url"]}" rel="noreferrer noopener" target="_blank">MTB 🔗</a>' if has_mtb else '<span style="color:#aaa">—</span>'
 
-        if has_bi:
-            color_bi = "#1a7f37" if row["bi_oszczednosc_pln"] > 0 else "#c0392b"
-            sign_bi = "+" if row["bi_oszczednosc_pln"] > 0 else ""
-            bi_pln = f"{row['bi_price_pln']:.2f} zł"
-            sav_bi_pln = f'<td style="text-align:right;color:{color_bi};font-weight:bold">{sign_bi}{row["bi_oszczednosc_pln"]:.2f} zł</td>'
-            sav_bi_pct = f'<td style="text-align:right;color:{color_bi};font-weight:bold">{sign_bi}{row["bi_oszczednosc_pct"]:.1f}%</td>'
-            bi_link = f'<a href="{row["bi_url"]}" rel="noreferrer noopener" target="_blank">BI 🔗</a>'
-        else:
-            bi_pln = "—"
-            sav_bi_pln = '<td style="text-align:right;color:#aaa">—</td>'
-            sav_bi_pct = '<td style="text-align:right;color:#aaa">—</td>'
-            bi_link = '<span style="color:#aaa">—</span>'
+        bi_pln = f"{row['bi_price_pln']:.2f} zł" if has_bi else "—"
+        bi_link = f'<a href="{row["bi_url"]}" rel="noreferrer noopener" target="_blank">BI 🔗</a>' if has_bi else '<span style="color:#aaa">—</span>'
 
         rows_html.append(f"""
         <tr>
             <td>{CATEGORY_LABELS.get(row['category'], row['category'])}</td>
             <td>{row['cr_name']}</td>
             <td style="text-align:right">{row['cr_price_pln']:.2f} zł</td>
-            <td style="text-align:right">{bd_eur}</td>
+            <td class="sep" style="text-align:right">{bd_eur}</td>
             <td style="text-align:right">{bd_pln}</td>
-            {sav_bd_pln}
-            {sav_bd_pct}
-            <td style="text-align:right">{mtb_pln}</td>
-            {sav_mtb_pln}
-            {sav_mtb_pct}
+            <td class="sep" style="text-align:right">{mtb_pln}</td>
             <td class="sep" style="text-align:right">{bi_pln}</td>
-            {sav_bi_pln}
-            {sav_bi_pct}
-            <td style="text-align:center">{cr_link}</td>
+            <td class="sep" style="text-align:center">{cr_link}</td>
             <td style="text-align:center">{bd_link}</td>
             <td style="text-align:center">{mtb_link}</td>
             <td style="text-align:center">{bi_link}</td>
@@ -289,9 +253,9 @@ else:
         <thead><tr>
             <th>Kategoria</th><th>Produkt (CR)</th>
             <th>CR (PLN)</th>
-            <th class="sep">BD (EUR)</th><th>BD (~PLN @ {eur_rate:.2f})</th><th>Oszcz. BD (PLN)</th><th>Oszcz. BD (%)</th>
-            <th class="sep">MTB (PLN)</th><th>Oszcz. MTB (PLN)</th><th>Oszcz. MTB (%)</th>
-            <th class="sep">BI (PLN)</th><th>Oszcz. BI (PLN)</th><th>Oszcz. BI (%)</th>
+            <th class="sep">BD (EUR)</th><th>BD (~PLN @ {eur_rate:.2f})</th>
+            <th class="sep">MTB (PLN)</th>
+            <th class="sep">BI (PLN)</th>
             <th class="sep">Link CR</th><th>Link BD</th><th>Link MTB</th><th>Link BI</th><th>Link AL</th>
         </tr></thead>
         <tbody>{''.join(rows_html)}</tbody>
