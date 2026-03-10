@@ -178,6 +178,7 @@ streamlit run app.py
 
 ## 📝 TODO
 
+- [ ] **Wyprostować matching** — jeden `canonical_product` powinien mieć `shop_listings` ze wszystkich sklepów gdzie produkt istnieje (np. ZEB Ultimate Charger 3.1 → jeden wpis z linkami do CR + BD + MTB + BI)
 - [ ] Automatyczne odświeżanie cen (GitHub Actions / cron)
 - [ ] Pobieranie kursu EUR/PLN z API (aktualnie NBP)
 - [ ] Więcej matchowań (aktualnie ~136 produktów kanonicznych)
