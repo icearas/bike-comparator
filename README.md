@@ -2,35 +2,31 @@
 
 Narzędzie do porównywania cen części rowerowych między sklepami internetowymi. Automatycznie scrape'uje produkty, dopasowuje je przy użyciu AI i prezentuje różnice cenowe w aplikacji webowej Streamlit.
 
+**Live:** https://bike-comparator-bhwfr2hvgau63gr6cbfvse.streamlit.app
+
 ---
 
 ## 🛒 Obsługiwane sklepy
 
-| Sklep | Waluta | Rola |
-|-------|--------|------|
-| centrumrowerowe.pl | PLN | baza katalogu (CR) |
-| bike-discount.de | EUR | porównanie (BD) |
-| mtbiker.pl | PLN | porównanie (MTB) |
-| allegro.pl | PLN | link do wyników wyszukiwania (AL) — bez scrapingu |
+| Sklep | Slug | Waluta |
+|-------|------|--------|
+| centrumrowerowe.pl | `cr` | PLN |
+| bike-discount.de | `bd` | EUR |
+| mtbiker.pl | `mtb` | PLN |
+| bikeinn.com | `bi` | PLN |
 
 ---
 
 ## 📦 Obsługiwane kategorie i marki
 
-| Kategoria | Marka | Grupy |
-|-----------|-------|-------|
-| Przerzutki tylne | Shimano | Deore, SLX, XT, XTR, Saint |
-| Przerzutki tylne | SRAM | Eagle 70/90, GX, NX, X01, XX1 |
-| Hamulce tarczowe | Shimano | Deore, SLX, XT, XTR, Saint |
-| Hamulce tarczowe | SRAM | Guide, Maven, DB8 |
-| Kasety | Shimano | Deore, SLX, XT, XTR |
-| Kasety | SRAM | Eagle 70/90, GX, NX, X01, XX1 |
-| Łańcuchy | Shimano | Deore, SLX, XT, XTR |
-| Łańcuchy | SRAM | Eagle (wszystkie) |
-| Widelce | RockShox | Wszystkie modele |
-| Widelce | FOX | Wszystkie modele |
-| Dampery | RockShox | Wszystkie modele |
-| Dampery | FOX | Wszystkie modele |
+| Kategoria | Marki |
+|-----------|-------|
+| Przerzutki tylne | Shimano (Deore–XTR), SRAM (Eagle 70–XX) |
+| Hamulce tarczowe | Shimano (Deore–XTR, Saint), SRAM (DB8, Guide, Maven) |
+| Kasety | Shimano (SLX–XTR), SRAM (GX–XX Eagle) |
+| Łańcuchy | Shimano, SRAM Eagle |
+| Widelce | RockShox, FOX |
+| Dampery | RockShox, FOX |
 
 ---
 
@@ -38,37 +34,62 @@ Narzędzie do porównywania cen części rowerowych między sklepami internetowy
 
 ```
 bike-comparator/
-├── .env                        # Klucz API Anthropic (nie commitować!)
 ├── app.py                      # Aplikacja Streamlit (frontend)
 ├── requirements.txt            # Zależności dla Streamlit Cloud
-├── data/
-│   ├── cr_all.csv             # Pełny katalog CR po filtrach (generowany przez export_cr.py)
-│   ├── matched_products.csv   # Dopasowania CR↔BD (generowane przez ai_matcher.py)
-│   └── mtb_matched.csv        # Dopasowania CR↔MTB (generowane przez mtb_matcher.py)
-└── backend/
-    ├── models.py               # Modele SQLAlchemy (SQLite)
-    ├── main.py                 # Orkiestracja scrapingu (CR + BD + MTB)
-    ├── seed_rules.py           # Wypełnienie reguł filtrowania
-    ├── ai_matcher.py           # Dopasowywanie CR↔BD przez AI → DB
-    ├── mtb_matcher.py          # Dopasowywanie CR↔MTB przez AI → data/mtb_matched.csv
-    ├── export_cr.py            # Eksport filtrowanych produktów CR z DB → data/cr_all.csv
-    └── scrapers/
-        ├── centrum_rowerowe.py # Scraper centrumrowerowe.pl
-        ├── bike_discount.py    # Scraper bike-discount.de
-        └── mtbiker.py          # Scraper mtbiker.pl (paginacja URL, Playwright)
+├── backend/
+│   ├── models.py               # Modele SQLAlchemy (PostgreSQL)
+│   ├── main.py                 # Orkiestracja scrapingu
+│   ├── seed_rules.py           # Wypełnienie reguł filtrowania
+│   ├── ai_matcher.py           # Dopasowywanie produktów przez AI (Claude Haiku)
+│   └── scrapers/
+│       ├── centrum_rowerowe.py # Scraper centrumrowerowe.pl
+│       ├── bike_discount.py    # Scraper bike-discount.de
+│       ├── mtbiker.py          # Scraper mtbiker.pl
+│       └── bikeinn.py          # Scraper bikeinn.com
 ```
 
 ---
 
 ## 🗄 Baza danych
 
-SQLite (`backend/bike_comparator.db`) z tabelami:
+PostgreSQL (`bike_tracker`) z tabelami:
 
 | Tabela | Opis |
 |--------|------|
-| `products` | Produkty ze wszystkich sklepów |
-| `matched_products` | Dopasowane pary produktów między sklepami |
-| `filter_rules` | Reguły filtrowania (marki i grupy do śledzenia) |
+| `brands` | Marki (Shimano, SRAM, RockShox, FOX, Magura) |
+| `categories` | Kategorie (widelce, hamulce, kasety, przerzutki, łańcuchy, amortyzatory) |
+| `shops` | Sklepy (cr, bd, mtb, bi) |
+| `canonical_products` | Kanoniczne nazwy produktów |
+| `shop_listings` | Ceny produktów per sklep |
+| `price_history` | Historia cen |
+
+Widok `v_price_comparison` — gotowe zestawienie cen per produkt (używane przez `app.py`).
+
+### Lokalna baza
+
+```bash
+# Stwórz bazę
+createdb bike_tracker
+
+# Utwórz schemat + seed danych
+cd backend
+python models.py
+python seed_rules.py
+```
+
+### Supabase (produkcja)
+
+Baza w chmurze na Supabase. Połączenie przez **Session Pooler** (IPv4, port 5432).
+`DATABASE_URL` ustawiony jako secret na Streamlit Cloud.
+
+Eksport lokalnej bazy do Supabase:
+
+```bash
+pg_dump -U arkadiuszmichnej bike_tracker \
+  --no-owner --no-acl --no-privileges \
+  --format=plain --inserts \
+  2>/dev/null | grep -v '^\\' > bike_tracker_supabase.sql
+```
 
 ---
 
@@ -77,311 +98,87 @@ SQLite (`backend/bike_comparator.db`) z tabelami:
 ### Wymagania
 
 - Python 3.12+
+- PostgreSQL
+- Playwright (dla scraperów)
 
 ### Instalacja
 
 ```bash
-# Sklonuj repo
 git clone <repo-url>
 cd bike-comparator
 
-# Utwórz venv i zainstaluj zależności
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install playwright beautifulsoup4 sqlalchemy httpx anthropic python-dotenv requests streamlit pandas
+pip install playwright beautifulsoup4 sqlalchemy psycopg2-binary httpx anthropic python-dotenv requests streamlit pandas
 
-# Zainstaluj Chromium dla Playwright
 playwright install chromium
 
-# Ustaw klucz API
+# Klucz API Anthropic
 echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
+
+# Lokalna baza PG
+export DATABASE_URL="postgresql://localhost/bike_tracker"
 ```
 
 ---
 
 ## 🚀 Uruchomienie
 
-### Pierwsze uruchomienie (od zera)
+### Scraping i matching
 
 ```bash
 cd backend
 source ../.venv/bin/activate
 
-# Utwórz bazę danych
-python models.py
-
-# Wypełnij reguły filtrowania
-python seed_rules.py
-
-# Uruchom scraping wszystkich 3 sklepów (kilka–kilkanaście minut)
+# Scraping wszystkich sklepów
 python main.py
 
-# --- LUB scraping wybranego sklepu z osobna ---
-
-# Tylko centrumrowerowe.pl (CR)
-python -c "
-import asyncio
-from main import save_products
-from scrapers.centrum_rowerowe import scrape_category
-CATEGORIES = ['przerzutki', 'hamulce', 'kasety', 'lancuchy', 'manetki', 'amortyzatory', 'widelce', 'dampery']
-async def run():
-    for cat in CATEGORIES:
-        save_products(await scrape_category(cat, max_pages=15))
-asyncio.run(run())
-"
-
-# Tylko bike-discount.de (BD)
-python -c "
-import asyncio
-from main import save_products
-from scrapers.bike_discount import scrape_category
-CATEGORIES = ['przerzutki', 'hamulce', 'kasety', 'lancuchy', 'widelce', 'dampery']
-async def run():
-    for cat in CATEGORIES:
-        save_products(await scrape_category(cat, max_pages=10))
-asyncio.run(run())
-"
-
-# Tylko mtbiker.pl (MTB)
-python -c "
-import asyncio
-from main import save_products
-from scrapers.mtbiker import scrape_category, CATEGORIES
-async def run():
-    for cat in CATEGORIES:
-        save_products(await scrape_category(cat))
-asyncio.run(run())
-"
-
-# Tylko bikeinn.com (BI)
-python -c "
-import asyncio
-from main import save_products
-from scrapers.bikeinn import scrape_category, CATEGORIES
-async def run():
-    for cat in CATEGORIES:
-        save_products(await scrape_category(cat))
-asyncio.run(run())
-"
-
-# Dopasuj CR↔BD (zapisuje do DB)
+# Dopasowanie AI
 python ai_matcher.py
-
-# Dopasuj CR↔MTB (zapisuje do data/mtb_matched.csv)
-python mtb_matcher.py
-
-# Dopasuj CR↔BI (zapisuje do data/bi_matched.csv)
-python bi_matcher.py
-
-# Eksportuj katalog CR do CSV
-python export_cr.py
-
-# Eksportuj dopasowania CR↔BD do CSV (patrz Przydatne komendy)
 ```
 
-### Kolejne uruchomienia (odświeżenie cen)
-
-```bash
-cd backend
-source ../.venv/bin/activate
-
-# Odśwież ceny (wszystkie 3 sklepy)
-python main.py
-
-# Wyczyść stare dopasowania CR↔BD i dopasuj ponownie
-python3 -c "from models import SessionLocal, MatchedProduct; db = SessionLocal(); db.query(MatchedProduct).delete(); db.commit(); db.close()"
-python ai_matcher.py
-
-# Dopasuj ponownie CR↔MTB (nadpisuje mtb_matched.csv)
-python mtb_matcher.py
-
-# Eksportuj katalog CR do CSV
-python export_cr.py
-
-# Eksportuj dopasowania CR↔BD do data/matched_products.csv (patrz Przydatne komendy)
-```
-
-> ⚠️ Dopasowywanie AI wymaga stabilnego połączenia z Anthropic API. W razie problemów z siecią domową użyj mobilnego hotspotu.
-
-### Reset matcha — pełne odświeżenie produktów (gdy zmieniły się reguły scrapera)
-
-Jeśli zmieniły się wykluczenia w scraper'ze (np. `SHIMANO_OLD_MODELS`, `SKIP_KEYWORDS`) i chcesz, żeby baza odzwierciedlała aktualny stan — **samo `python main.py` nie wystarczy**, bo `save_products()` używa upsert (nie usuwa starych rekordów).
-
-Wymagana kolejność:
-
-```bash
-# 1. Wyczyść dopasowania i stare produkty CR
-sqlite3 /Users/arkadiuszmichnej/bike-comparator/backend/bike_comparator.db \
-  "DELETE FROM matched_products; DELETE FROM products WHERE shop = 'centrumrowerowe.pl';"
-
-# 2. Sprawdź czy DELETE poszło (oba wyniki powinny być 0)
-sqlite3 /Users/arkadiuszmichnej/bike-comparator/backend/bike_comparator.db \
-  "SELECT COUNT(*) FROM matched_products; SELECT COUNT(*) FROM products WHERE shop = 'centrumrowerowe.pl';"
-
-# 3. Re-scrape CR
-cd backend
-python main.py
-
-# 4. Re-match
-python ai_matcher.py
-
-# 5. Eksportuj katalog CR do CSV
-python export_cr.py
-
-# 6. Eksportuj dopasowania do data/matched_products.csv (patrz Przydatne komendy)
-```
-
-> ⚠️ Jeśli zmieniły się reguły w scraperze BD (np. `SUSPENSION_SKIP`, `ALLOWED_GROUPS`) — należy wyczyścić i ponownie zescrapować również produkty BD, zastępując `centrumrowerowe.pl` przez `bike-discount.de` w krokach powyżej.
-
----
-
-## 🖥 Aplikacja Streamlit
-
-### Uruchomienie lokalne
+### Aplikacja lokalna
 
 ```bash
 source .venv/bin/activate
 streamlit run app.py
 ```
 
-Aplikacja otworzy się w przeglądarce pod adresem `http://localhost:8501`.
-
-### Funkcje aplikacji
-
-- **Pełny katalog CR** — baza to wszystkie produkty z centrumrowerowe.pl po filtrach; BD, MTB i BI match pokazywany tam gdzie istnieje
-- **Kurs EUR/PLN** — automatycznie pobierany z API NBP (kurs średni tabela A, odświeżany co 1h); można ręcznie nadpisać
-- **Filtr kategorii** — pokaż tylko wybraną kategorię części
-- **Filtr marki** — multiselect: Shimano, SRAM, RockShox, FOX
-- **Filtr sklepu** — multiselect: pokaż tylko produkty dostępne w wybranym sklepie (CR, BD, MTB, BI)
-- **Wyszukiwarka** — pole tekstowe filtruje po nazwie produktu (CR, BD, MTB lub BI)
-- **Tabela z cenami** — kolumny CR / BD (EUR + PLN) / MTB / BI obok siebie; link do każdego sklepu + link AL do Allegro
-
-### Deploy na Streamlit Community Cloud (bezpłatny)
-
-1. Upewnij się, że w repo są aktualne `data/cr_all.csv` i `data/matched_products.csv`
-2. Wejdź na [share.streamlit.io](https://share.streamlit.io) i zaloguj się przez GitHub
-3. Kliknij **New app** → wskaż repo → ustaw **Main file path**: `app.py`
-4. Kliknij **Deploy**
-
-> Po każdym odświeżeniu cen: uruchom `python export_cr.py`, `python mtb_matcher.py` i wyeksportuj `matched_products.csv`, zacommituj wszystkie trzy pliki CSV i pushuj — Streamlit Cloud automatycznie pobierze nowe dane.
-
 ---
 
 ## 🤖 Jak działa dopasowywanie AI
 
-Dwa niezależne matchery: `ai_matcher.py` (CR↔BD, wyniki w DB) i `mtb_matcher.py` (CR↔MTB, wyniki w `data/mtb_matched.csv`). Oba działają identycznie:
+1. Produkty filtrowane przez reguły z `filter_rules` (marki, grupy)
+2. Części serwisowe odrzucane przez `SKIP_KEYWORDS`
+3. Pre-filter po numerach modelu (np. `RD-M8100`) — max 3 kandydatów
+4. Pre-filter po grade zawieszenia (Factory ≠ Performance ≠ Rhythm)
+5. Claude Haiku ocenia czy to ten sam produkt (JSON: `same` + `confidence`)
+6. Dopasowania z confidence ≥ 95% zapisywane do `shop_listings`
 
-1. Produkty są filtrowane przez reguły z tabeli `filter_rules` (tylko wybrane marki i grupy)
-2. Części serwisowe, narzędzia i akcesoria (klocki, linki, rebuild kity, narzędzia, tokeny, płyny itp.) są odrzucane przez rozszerzoną listę `SKIP_KEYWORDS`
-3. Dla każdego produktu z CR szukamy kandydatów z BD/MTB tej samej marki i kategorii
-4. Pre-filter po **grade zawieszenia** — FOX (Factory/Performance Elite/E-Optimized/Performance/Rhythm) i RockShox (Ultimate/Select+/Select/R) — zapobiega krzyżowaniu grade'ów; FOX bez grade'u (`fox_ungraded`) nie jest matchowany
-5. Pre-filter po numerach modelu (np. `RD-M8100`, `BL-M9220`) zawęża kandydatów do max 3 przed wywołaniem AI
-6. Claude Haiku ocenia czy dwa produkty to ten sam produkt (zwraca JSON z `same` i `confidence`); wersje dampera (Charger 3 vs Charger 3.1) traktowane jako różne produkty
-7. Dopasowania z confidence ≥ 95% są zapisywane (CR↔BD → DB, CR↔MTB → CSV)
-
-**Parametry matchera** (`ai_matcher.py`):
-
-| Parametr | Wartość | Opis |
-|----------|---------|------|
-| `CONFIDENCE_THRESHOLD` | 0.95 | Minimalny próg pewności dopasowania |
-| `PARALLEL_CALLS` | 3 | Liczba równoległych wywołań Claude API |
-| `MODEL` | claude-haiku-4-5 | Model używany do porównań |
-
----
-
-## 🛠 Przydatne komendy
-
-### Eksport danych do CSV (dla Streamlit)
-
-```bash
-cd ~/bike-comparator/backend
-source ../.venv/bin/activate
-
-# Eksport katalogu CR (przefiltrowane produkty z URLami)
-python export_cr.py
-
-# Eksport dopasowań CR↔BD
-python3 -c "
-import csv
-from models import SessionLocal, MatchedProduct
-from datetime import timezone
-
-db = SessionLocal()
-rows = db.query(MatchedProduct).all()
-db.close()
-
-with open('../data/matched_products.csv', 'w', newline='', encoding='utf-8') as f:
-    w = csv.writer(f)
-    w.writerow(['category','cr_name','cr_price_pln','cr_url','bd_name','bd_price_eur','bd_url','match_confidence','matched_at'])
-    for r in rows:
-        w.writerow([r.category, r.cr_name, r.cr_price_pln, r.cr_url, r.bd_name, r.bd_price_eur, r.bd_url, r.match_confidence, r.matched_at])
-print(f'Wyeksportowano {len(rows)} dopasowań')
-"
-```
-
-### Eksport surowych produktów do CSV (diagnostyka)
-
-```bash
-cd ~/bike-comparator/backend
-python3 -c "
-import sqlite3, csv
-
-conn = sqlite3.connect('bike_comparator.db')
-cursor = conn.cursor()
-
-cursor.execute(\"SELECT name, category, price FROM products WHERE shop='centrumrowerowe.pl' ORDER BY category, name\")
-with open('cr_products.csv', 'w', newline='', encoding='utf-8') as f:
-    writer = csv.writer(f)
-    writer.writerow(['name', 'category', 'price_pln'])
-    writer.writerows(cursor.fetchall())
-
-cursor.execute(\"SELECT name, category, price FROM products WHERE shop='bike-discount.de' ORDER BY category, name\")
-with open('bd_products.csv', 'w', newline='', encoding='utf-8') as f:
-    writer = csv.writer(f)
-    writer.writerow(['name', 'category', 'price_eur'])
-    writer.writerows(cursor.fetchall())
-
-conn.close()
-print('Gotowe: cr_products.csv i bd_products.csv')
-"
-```
-
-### Wyczyszczenie bazy i scraping od nowa
-
-```bash
-python3 -c "
-from models import SessionLocal, Product
-db = SessionLocal()
-db.query(Product).delete()
-db.commit()
-db.close()
-print('Wyczyszczono')
-"
-python main.py
-```
+| Parametr | Wartość |
+|----------|---------|
+| `CONFIDENCE_THRESHOLD` | 0.95 |
+| `PARALLEL_CALLS` | 3 |
+| Model | claude-haiku-4-5 |
 
 ---
 
 ## 🌐 Deploy
 
-Aplikacja działa na Streamlit Community Cloud:
-`https://bike-comparator-bhwfr2hvgau63gr6cbfvse.streamlit.app`
+- **Streamlit Cloud:** `https://bike-comparator-bhwfr2hvgau63gr6cbfvse.streamlit.app`
+- Repo prywatne — Streamlit ma dostęp przez GitHub OAuth (`icearas`)
+- Secret `DATABASE_URL` wskazuje na Supabase (Session Pooler, IPv4)
 
-Repo jest **prywatne** — Streamlit ma dostęp przez GitHub OAuth (połączone konto `icearas`).
-Apka jest publiczna (Settings → Sharing → Public w panelu Streamlit).
-
-### Uwagi deployment
-- `uv.lock` **nie jest w repo** — Streamlit używa tylko `requirements.txt`
-- `.python-version` = `3.12`, `pyproject.toml` `requires-python = ">=3.12"`
-- Linki w tabeli używają `rel="noreferrer noopener"` — centrumrowerowe.pl blokuje ruch z referrerem `streamlit.app`
+### Uwagi
+- `requirements.txt` musi zawierać `psycopg2-binary`
+- psycopg2 zwraca `Decimal` dla kolumn `numeric` — konwertowane przez `pd.to_numeric()` w `app.py`
+- Linki używają `rel="noreferrer noopener"` — centrumrowerowe.pl blokuje ruch z referrerem `streamlit.app`
 
 ---
 
 ## 📝 TODO
 
-- [ ] Dodać grupę Shimano GRX (gravel) i jej odpowiedniki SRAM (Rival eTap AXS / Force eTap AXS) — scraper + reguły filtrowania + matching
-- [ ] Poprawić matchowanie — więcej dopasowanych produktów z mtbiker.pl
-- [x] Dodać czwarty sklep ze scrapingiem: bikeinn.com ✅
-- [ ] Allegro Opcja B — integracja z Allegro REST API (OAuth 2.0): pobieranie najniższej ceny nowego produktu i wyświetlanie w tabeli (aktualnie jest tylko link do wyników)
-- [ ] Dodać automatyczne odświeżanie cen (cron / GitHub Actions)
-- [ ] Refaktor DB → ujednolicony schemat PostgreSQL: `canonical_products` + `shop_listings` (schemat w `DATABASE.md`) — umożliwi kanoniczną nazwę produktu i łatwe dodawanie kolejnych sklepów
+- [ ] Automatyczne odświeżanie cen (GitHub Actions / cron)
+- [ ] Pobieranie kursu EUR/PLN z API (aktualnie NBP)
+- [ ] Więcej matchowań (aktualnie ~136 produktów kanonicznych)
+- [ ] Dodać scraper sprint-rowery.pl
