@@ -6,11 +6,12 @@ import json
 import asyncio
 import re
 from anthropic import AsyncAnthropic
-from models import SessionLocal, Product, MatchedProduct, FilterRule
-from datetime import datetime, timezone
+from db import get_conn, SHOP_IDS, assign_match
+from filter_rules import FILTER_RULES
 from dotenv import load_dotenv
 import os
 import time
+from types import SimpleNamespace
 
 load_dotenv(dotenv_path="../.env")
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -122,8 +123,8 @@ def extract_suspension_grade(name: str) -> str | None:
     return None
 
 
-def load_filter_rules(db) -> list:
-    return db.query(FilterRule).filter_by(active=1).all()
+def load_filter_rules(db=None) -> list:
+    return FILTER_RULES
 
 
 def is_main_product(name: str, category: str, rules: list, url: str = "") -> bool:
@@ -261,24 +262,39 @@ async def rate_limited_call(name_cr: str, name_bd: str, category: str) -> tuple[
     return await are_same_product(name_cr, name_bd, category)
 
 
+def _load_listings(shop_slug: str) -> list:
+    """Wczytuje shop_listings z PostgreSQL jako SimpleNamespace (name, category, price, url, id, canonical_product_id)."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, raw_name, raw_category, price, currency, url, canonical_product_id
+        FROM shop_listings
+        WHERE shop_id = %s
+    """, (SHOP_IDS[shop_slug],))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [
+        SimpleNamespace(id=r[0], name=r[1], category=r[2] or "", price=float(r[3]),
+                        currency=r[4].strip(), url=r[5], canonical_product_id=r[6])
+        for r in rows
+    ]
+
+
 async def match_with_ai(limit: int = 300):
     start = time.time()
     print(f"🚀 MATCHER | Limit: {limit} | Start: {time.strftime('%H:%M:%S')}")
 
-    db = SessionLocal()
-    try:
-        rules = load_filter_rules(db)
-        cr_products = db.query(Product).filter_by(shop="centrumrowerowe.pl").all()
-        bd_products = db.query(Product).filter_by(shop="bike-discount.de").all()
+    rules = load_filter_rules()
+    cr_all  = _load_listings("cr")
+    bd_all  = _load_listings("bd")
 
-        cr_main = [p for p in cr_products if is_main_product(p.name, p.category, rules, p.url or "")]
-        bd_main = [p for p in bd_products if is_main_product(p.name, p.category, rules, p.url or "")]
-    finally:
-        db.close()
+    cr_main = [p for p in cr_all if is_main_product(p.name, p.category, rules, p.url or "")]
+    bd_main = [p for p in bd_all if is_main_product(p.name, p.category, rules, p.url or "")]
 
     print(f"CR po filtrowaniu: {len(cr_main)} | BD po filtrowaniu: {len(bd_main)}")
 
-    bd_by_brand_cat = {}
+    bd_by_brand_cat: dict = {}
     for bd in bd_main:
         brand = extract_brand(bd.name, bd.url)
         key = (brand, bd.category)
@@ -287,96 +303,66 @@ async def match_with_ai(limit: int = 300):
     semaphore = asyncio.Semaphore(PARALLEL_CALLS)
     matched = 0
 
-    async def process_cr(i: int, cr: Product):
+    async def process_cr(i: int, cr: SimpleNamespace):
         nonlocal matched
 
-        # Semafora wokół całej funkcji — limituje do PARALLEL_CALLS równoległych tasków
-        # (nie 181 jednocześnie), ale ticket scheduling w rate_limited_call zapewnia
-        # że te 3 taski naprawdę startują API calle równolegle co 1.3s
         async with semaphore:
-            task_db = SessionLocal()
-            try:
-                existing = task_db.query(MatchedProduct).filter_by(cr_product_id=cr.id).first()
-                if existing:
-                    return
+            # Pomiń jeśli już zmatchowany
+            if cr.canonical_product_id is not None:
+                return
 
-                cr_brand = extract_brand(cr.name, cr.url)
-                bd_category = CATEGORY_MAP.get(cr.category, cr.category)
+            cr_brand = extract_brand(cr.name, cr.url)
+            bd_category = CATEGORY_MAP.get(cr.category, cr.category)
 
-                if cr.category in ("widelce", "dampery"):
-                    # CR przechowuje szoki (dampery) jako "widelce" (z amortyzatory scrape)
-                    # → szukamy w OBIE kategoriach BD: widelce i dampery
-                    candidates = (
-                        bd_by_brand_cat.get((cr_brand, "widelce"), []) +
-                        bd_by_brand_cat.get((cr_brand, "dampery"), [])
-                    )
-                    # Pre-filter po grade (Factory ≠ Performance ≠ Rhythm, Select ≠ Ultimate ≠ R)
-                    cr_grade = extract_suspension_grade(cr.name)
-                    if cr_grade:
-                        grade_filtered = [bd for bd in candidates if extract_suspension_grade(bd.name) == cr_grade]
-                        if grade_filtered:
-                            candidates = grade_filtered
-                        else:
-                            # BD nie ma tego grade'u — brak matcha
-                            print(f"❌ [{i+1}] {cr.name[:50]} - BD nie ma grade '{cr_grade}'")
-                            return
-                else:
-                    candidates = bd_by_brand_cat.get((cr_brand, bd_category), [])
-
-                if not candidates:
-                    print(f"❌ [{i+1}] {cr.name[:50]} - brak kandydatów")
-                    return
-
-                # Pre-filter po numerach modelu (obsługa wielu numerów np. BL-M9220 + BR-M9200)
-                cr_models = extract_model_numbers(cr.name)
-                if cr_models:
-                    filtered = [bd for bd in candidates if any(m in bd.name.upper() for m in cr_models)]
-                    if filtered:
-                        candidates = filtered[:3]
-                        print(f"🔍 [{i+1}] Pre-filter: {cr_models} → {len(candidates)} kandydatów")
+            if cr.category in ("widelce", "dampery"):
+                candidates = (
+                    bd_by_brand_cat.get((cr_brand, "widelce"), []) +
+                    bd_by_brand_cat.get((cr_brand, "dampery"), [])
+                )
+                cr_grade = extract_suspension_grade(cr.name)
+                if cr_grade:
+                    grade_filtered = [bd for bd in candidates if extract_suspension_grade(bd.name) == cr_grade]
+                    if grade_filtered:
+                        candidates = grade_filtered
                     else:
-                        candidates = candidates[:5]
+                        print(f"❌ [{i+1}] {cr.name[:50]} - BD nie ma grade '{cr_grade}'")
+                        return
+            else:
+                candidates = bd_by_brand_cat.get((cr_brand, bd_category), [])
+
+            if not candidates:
+                print(f"❌ [{i+1}] {cr.name[:50]} - brak kandydatów")
+                return
+
+            cr_models = extract_model_numbers(cr.name)
+            if cr_models:
+                filtered = [bd for bd in candidates if any(m in bd.name.upper() for m in cr_models)]
+                if filtered:
+                    candidates = filtered[:3]
+                    print(f"🔍 [{i+1}] Pre-filter: {cr_models} → {len(candidates)} kandydatów")
                 else:
                     candidates = candidates[:5]
+            else:
+                candidates = candidates[:5]
 
-                best_match = None
-                best_confidence = 0.0
-                for bd in candidates:
-                    is_same, confidence = await rate_limited_call(cr.name, bd.name, cr.category)
-                    if is_same and confidence >= CONFIDENCE_THRESHOLD:
-                        best_match = bd
-                        best_confidence = confidence
-                        break  # pierwszy dobry match wystarczy — pre-filter już wybrał kandydatów
+            best_match = None
+            best_confidence = 0.0
+            for bd in candidates:
+                is_same, confidence = await rate_limited_call(cr.name, bd.name, cr.category)
+                if is_same and confidence >= CONFIDENCE_THRESHOLD:
+                    best_match = bd
+                    best_confidence = confidence
+                    break
 
-                if best_match:
-                    existing_match = task_db.query(MatchedProduct).filter_by(
-                        cr_product_id=cr.id,
-                        bd_product_id=best_match.id
-                    ).first()
-                    if not existing_match:
-                        match_obj = MatchedProduct(
-                            name_normalized=cr.name,
-                            category=cr.category,
-                            cr_product_id=cr.id,
-                            cr_name=cr.name,
-                            cr_price_pln=cr.price,
-                            cr_url=cr.url,
-                            bd_product_id=best_match.id,
-                            bd_name=best_match.name,
-                            bd_price_eur=best_match.price,
-                            bd_url=best_match.url,
-                            match_method="ai_model_prefilter",
-                            match_confidence=best_confidence,
-                            matched_at=datetime.now(timezone.utc)
-                        )
-                        task_db.add(match_obj)
-                        task_db.commit()
-                        matched += 1
-                        print(f"✅ [{i+1}] {cr.name[:40]} → {best_match.name[:40]} ({best_confidence:.0%})")
-                else:
-                    print(f"❌ [{i+1}] {cr.name[:50]} - brak matcha")
-            finally:
-                task_db.close()
+            if best_match:
+                conn = get_conn()
+                assign_match(conn, cr.id, best_match.id, cr.name,
+                             cr.category, cr_brand, best_confidence)
+                conn.close()
+                matched += 1
+                print(f"✅ [{i+1}] {cr.name[:40]} → {best_match.name[:40]} ({best_confidence:.0%})")
+            else:
+                print(f"❌ [{i+1}] {cr.name[:50]} - brak matcha")
 
     tasks = [process_cr(i, cr) for i, cr in enumerate(cr_main[:limit])]
     await asyncio.gather(*tasks)

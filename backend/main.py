@@ -1,39 +1,44 @@
 import asyncio
 import time
-from models import SessionLocal, Product, init_db
+from db import get_conn, SHOP_NAME_TO_SLUG, SHOP_IDS
 from scrapers.centrum_rowerowe import scrape_category as scrape_cr
 from scrapers.bike_discount import scrape_category as scrape_bd
 from scrapers.mtbiker import scrape_category as scrape_mtb
 from scrapers.bikeinn import scrape_category as scrape_bi
-from datetime import datetime
 
 
 def save_products(products: list[dict]):
-    db = SessionLocal()
+    conn = get_conn()
+    cur = conn.cursor()
     saved = 0
     updated = 0
     for p in products:
-        existing = db.query(Product).filter_by(name=p.get("name"), shop=p.get("shop")).first()
-        if existing:
-            # Aktualizuj cenę jeśli produkt już istnieje
-            existing.price = p.get("price")
-            existing.scraped_at = datetime.utcnow()
-            updated += 1
-        else:
-            product = Product(
-                name=p.get("name"),
-                sku=p.get("sku"),
-                brand=p.get("brand"),
-                price=p.get("price"),
-                currency=p.get("currency", "PLN"),
-                shop=p.get("shop"),
-                category=p.get("category"),
-                url=p.get("url"),
-            )
-            db.add(product)
+        slug = SHOP_NAME_TO_SLUG.get(p.get("shop", ""))
+        if not slug:
+            continue
+        url = p.get("url")
+        if not url:
+            continue
+        shop_id = SHOP_IDS[slug]
+        cur.execute("""
+            INSERT INTO shop_listings (shop_id, raw_name, price, currency, url, raw_category, scraped_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (shop_id, url) DO UPDATE SET
+                raw_name     = EXCLUDED.raw_name,
+                price        = EXCLUDED.price,
+                raw_category = EXCLUDED.raw_category,
+                scraped_at   = NOW()
+            RETURNING (xmax = 0)
+        """, (shop_id, p.get("name"), p.get("price"), p.get("currency", "PLN"),
+              url, p.get("category", "")))
+        row = cur.fetchone()
+        if row and row[0]:
             saved += 1
-    db.commit()
-    db.close()
+        else:
+            updated += 1
+    conn.commit()
+    cur.close()
+    conn.close()
     print(f"Zapisano {saved} nowych, zaktualizowano {updated} produktów.")
 
 
@@ -86,5 +91,4 @@ async def scrape_all():
 
 
 if __name__ == "__main__":
-    init_db()
     asyncio.run(scrape_all())

@@ -1,30 +1,26 @@
 """
 MTB_MATCHER — dopasowywanie CR ↔ mtbiker.pl przez AI
-Wyniki zapisywane do data/mtb_matched.csv
+Wyniki zapisywane do PostgreSQL (canonical_product_id na shop_listings)
 """
 
-import csv
 import json
 import asyncio
 import re
 import time
-from pathlib import Path
-from datetime import datetime, timezone
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 import os
+from types import SimpleNamespace
 
-from models import SessionLocal, Product
+from db import get_conn, SHOP_IDS, assign_match
 from ai_matcher import (
     SKIP_KEYWORDS, CATEGORY_MAP, CONFIDENCE_THRESHOLD, MODEL, PARALLEL_CALLS,
     extract_suspension_grade, load_filter_rules, is_main_product,
-    extract_brand, extract_model_numbers, SUSPENSION_MODEL_KEYWORDS,
+    extract_brand, extract_model_numbers, _load_listings,
 )
 
 load_dotenv(dotenv_path="../.env")
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
-OUT_PATH = Path(__file__).parent.parent / "data" / "mtb_matched.csv"
 
 _last_call = 0.0
 _rate_lock = asyncio.Lock()
@@ -97,31 +93,25 @@ async def match_mtb(limit: int = 300):
     start = time.time()
     print(f"🚀 MTB MATCHER | Limit: {limit} | Start: {time.strftime('%H:%M:%S')}")
 
-    db = SessionLocal()
-    try:
-        rules = load_filter_rules(db)
-        cr_products = db.query(Product).filter_by(shop="centrumrowerowe.pl").all()
-        mtb_products = db.query(Product).filter_by(shop="mtbiker.pl").all()
-    finally:
-        db.close()
+    rules = load_filter_rules()
+    cr_all  = _load_listings("cr")
+    mtb_all = _load_listings("mtb")
 
-    cr_main = [p for p in cr_products if is_main_product(p.name, p.category, rules, p.url or "")]
-    mtb_main = [p for p in mtb_products if is_main_product(p.name, p.category, rules, p.url or "")]
+    cr_main  = [p for p in cr_all  if is_main_product(p.name, p.category, rules, p.url or "")]
+    mtb_main = [p for p in mtb_all if is_main_product(p.name, p.category, rules, p.url or "")]
 
     print(f"CR po filtrowaniu: {len(cr_main)} | MTB po filtrowaniu: {len(mtb_main)}")
 
-    mtb_by_brand_cat: dict[tuple, list] = {}
+    mtb_by_brand_cat: dict = {}
     for mtb in mtb_main:
         brand = extract_brand(mtb.name, mtb.url)
         key = (brand, mtb.category)
         mtb_by_brand_cat.setdefault(key, []).append(mtb)
 
     semaphore = asyncio.Semaphore(PARALLEL_CALLS)
-    results: list[dict] = []
-    results_lock = asyncio.Lock()
     matched = 0
 
-    async def process_cr(i: int, cr: Product):
+    async def process_cr(i: int, cr: SimpleNamespace):
         nonlocal matched
         async with semaphore:
             cr_brand = extract_brand(cr.name, cr.url)
@@ -166,19 +156,11 @@ async def match_mtb(limit: int = 300):
                     break
 
             if best_match:
-                async with results_lock:
-                    results.append({
-                        "category": cr.category,
-                        "cr_name": cr.name,
-                        "cr_price_pln": cr.price,
-                        "cr_url": cr.url or "",
-                        "mtb_name": best_match.name,
-                        "mtb_price_pln": best_match.price,
-                        "mtb_url": best_match.url or "",
-                        "match_confidence": best_confidence,
-                        "matched_at": datetime.now(timezone.utc).isoformat(),
-                    })
-                    matched += 1
+                conn = get_conn()
+                assign_match(conn, cr.id, best_match.id, cr.name,
+                             cr.category, cr_brand, best_confidence)
+                conn.close()
+                matched += 1
                 print(f"✅ [{i+1}] {cr.name[:40]} → {best_match.name[:40]} ({best_confidence:.0%})")
             else:
                 print(f"❌ [{i+1}] {cr.name[:50]} - brak matcha")
@@ -186,19 +168,8 @@ async def match_mtb(limit: int = 300):
     tasks = [process_cr(i, cr) for i, cr in enumerate(cr_main[:limit])]
     await asyncio.gather(*tasks)
 
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUT_PATH, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=[
-            "category", "cr_name", "cr_price_pln", "cr_url",
-            "mtb_name", "mtb_price_pln", "mtb_url",
-            "match_confidence", "matched_at",
-        ])
-        writer.writeheader()
-        writer.writerows(results)
-
     elapsed_min = (time.time() - start) / 60
     print(f"\n🎯 WYNIK: {matched} matchów | {elapsed_min:.1f} min")
-    print(f"📄 Zapisano do: {OUT_PATH}")
 
 
 if __name__ == "__main__":
