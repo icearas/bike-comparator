@@ -64,6 +64,10 @@ def load_data() -> pd.DataFrame:
     df = pd.DataFrame(rows, columns=cols)
     # Pomiń wiersze bez ceny CR (canonical produkt bez listingu CR)
     df = df[df["cr_price_pln"].notna()].copy()
+    # psycopg2 zwraca Decimal dla numeric — konwertuj na float
+    for col in ["cr_price_pln", "bd_price_eur", "mtb_price_pln", "bi_price_pln"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
