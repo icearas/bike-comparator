@@ -101,3 +101,12 @@
 - Usunięcie kolumn oszczędności (PLN i %) — tabela pokazuje teraz tylko ceny ze wszystkich sklepów
 - Sortowanie zmienione na cenę CR malejąco (zmatchowane produkty pierwsze)
 - Filtr sklepu rozszerzony o centrumrowerowe.pl i bikeinn.com
+
+## 2.4 — Migracja do PostgreSQL + Supabase
+- Migracja backendu z SQLite/CSV na PostgreSQL (`bike_tracker`)
+- Nowy schemat: `brands`, `categories`, `shops`, `canonical_products`, `shop_listings`, `price_history`
+- Widok `v_price_comparison` zastępuje pliki CSV jako źródło danych dla `app.py`
+- `app.py` przepisane na psycopg2 (bezpośrednie połączenie z PostgreSQL)
+- Baza w chmurze: Supabase (Session Pooler IPv4, port 5432)
+- `DATABASE_URL` jako secret na Streamlit Cloud
+- Fix: psycopg2 zwraca `Decimal` dla kolumn `numeric` — konwersja przez `pd.to_numeric()`
